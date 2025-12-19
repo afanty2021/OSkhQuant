@@ -257,7 +257,7 @@ sandbox/
 
 # 文档生成
 docs/_build/
-doc/_build/ 
+doc/_build/
 __pycache__/
 app.log
 __pycache__
@@ -267,3 +267,7 @@ build_inno.bat
 __pycache__/GUIplotLoadData.cpython-311.pyc
 Output
 app.log
+
+# ===== 工作流和规范 =====
+# Spec工作流文件
+.spec-workflow/
