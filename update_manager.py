@@ -102,15 +102,27 @@ class UpdateCheckThread(QThread):
     def compare_versions(new_version, current_version):
         """比较版本号，如果new_version大于current_version返回True"""
         try:
-            logging.debug(f"比较版本: 新版本={new_version}, 当前版本={current_version}")  # 添加日志
+            logging.debug(f"比较版本: 新版本={new_version}, 当前版本={current_version}")
             
             # 移除版本号前的'v'或'V'并转换为小写
             new_version = new_version.lower().strip('v')
             current_version = current_version.lower().strip('v')
             
-            # 将版本号分割为数字列表
-            new_parts = [int(x) for x in new_version.split('.')]
-            current_parts = [int(x) for x in current_version.split('.')]
+            # 处理版本号中的预发布标识符（如 -dev, -beta, -alpha 等）
+            def parse_version(version_str):
+                """解析版本号，分离主版本号和预发布标识符"""
+                # 分离主版本号和预发布标识符
+                if '-' in version_str:
+                    main_version, prerelease = version_str.split('-', 1)
+                else:
+                    main_version, prerelease = version_str, None
+                
+                # 将主版本号转换为数字列表
+                parts = [int(x) for x in main_version.split('.')]
+                return parts, prerelease
+            
+            new_parts, new_prerelease = parse_version(new_version)
+            current_parts, current_prerelease = parse_version(current_version)
             
             # 确保两个版本号列表长度相同
             while len(new_parts) < len(current_parts):
@@ -121,14 +133,34 @@ class UpdateCheckThread(QThread):
             # 逐位比较版本号
             for new, current in zip(new_parts, current_parts):
                 if new > current:
-                    logging.debug("发现新版本")  # 添加日志
+                    logging.debug("发现新版本")
                     return True
                 elif new < current:
-                    logging.debug("当前版本更新")  # 添加日志
+                    logging.debug("当前版本更新")
                     return False
             
-            # 如果所有位都相同，返回False（不需要更新）
-            logging.debug("版本号相同")  # 添加日志
+            # 如果主版本号相同，比较预发布标识符
+            # 规则：正式版 > 预发布版，预发布版之间按字母顺序比较
+            # 例如: 2.1.5 > 2.1.5-dev, 2.1.5-rc > 2.1.5-beta
+            if new_prerelease is None and current_prerelease is not None:
+                # 新版本是正式版，当前版本是预发布版，新版本更大
+                logging.debug("新版本是正式版，当前是预发布版")
+                return True
+            elif new_prerelease is not None and current_prerelease is None:
+                # 新版本是预发布版，当前版本是正式版，当前版本更大
+                logging.debug("新版本是预发布版，当前是正式版")
+                return False
+            elif new_prerelease is not None and current_prerelease is not None:
+                # 两个都是预发布版，按字母顺序比较
+                if new_prerelease > current_prerelease:
+                    logging.debug(f"新预发布版本更新: {new_prerelease} > {current_prerelease}")
+                    return True
+                elif new_prerelease < current_prerelease:
+                    logging.debug(f"当前预发布版本更新: {current_prerelease} > {new_prerelease}")
+                    return False
+            
+            # 如果所有都相同，返回False（不需要更新）
+            logging.debug("版本号相同")
             return False
             
         except Exception as e:

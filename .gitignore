@@ -95,10 +95,6 @@ settings.ini
 # 日志文件
 logs/
 *.log
-app.log
-debug.log
-error.log
-trade.log
 
 # 数据文件
 data/stock_list/
