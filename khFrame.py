@@ -21,7 +21,7 @@ from khQTTools import KhQuTools, determine_pool_type, format_price, round_price,
 from khConfig import KhConfig
 
 import numpy as np
-from PyQt5.QtCore import Qt, QMetaObject, Q_ARG, QObject
+from PyQt5.QtCore import Qt, QMetaObject, Q_ARG, QObject, QEventLoop, QTimer
 from PyQt5.QtWidgets import QMessageBox
 import pandas as pd
 import os
@@ -602,51 +602,90 @@ class KhQuantFramework:
         pass
 
     def load_strategy(self, strategy_file: str):
-        """动态加载策略模块
+        """动态加载策略模块（带安全验证）
 
         Args:
             strategy_file: 策略文件路径
 
         Returns:
             module: 策略模块
+
+        Raises:
+            SecurityError: 策略文件安全验证失败时抛出
         """
         print(f"[DEBUG] load_strategy 被调用，参数: {strategy_file}")
+
+        # 导入安全模块
+        from khSecurity import SafePathResolver, StrategySecurityValidator, SecurityError
+
         import importlib.util
         import sys
         import os
 
-        # 获取策略文件的绝对路径
-        strategy_file = os.path.abspath(strategy_file)
-        print(f"[DEBUG] 策略文件绝对路径: {strategy_file}")
+        try:
+            # 1. 安全路径解析
+            resolver = SafePathResolver()
+            safe_path = resolver.resolve(strategy_file)
 
-        # 使用策略文件的实际文件名作为模块名（不含.py扩展名）
-        # 这样debugpy可以正确识别模块
-        module_name = os.path.splitext(os.path.basename(strategy_file))[0]
-        print(f"[DEBUG] 模块名: {module_name}")
+            # 2. 验证文件扩展名
+            if safe_path.suffix.lower() not in ('.py', '.kh'):
+                raise SecurityError(f"不支持的文件类型: {safe_path.suffix}")
 
-        # 创建模块规范
-        spec = importlib.util.spec_from_file_location(module_name, strategy_file)
-        print(f"[DEBUG] spec 创建成功")
+            # 3. 验证策略代码安全性
+            validator = StrategySecurityValidator()
+            is_safe, messages = validator.validate_file(str(safe_path))
 
-        # 创建模块对象
-        strategy_module = importlib.util.module_from_spec(spec)
-        print(f"[DEBUG] 模块对象创建成功")
+            if not is_safe:
+                error_msg = f"策略安全验证失败:\n" + "\n".join(f"  - {msg}" for msg in messages)
+                raise SecurityError(error_msg)
 
-        # 将模块添加到sys.modules，这样debugpy可以找到它
-        # 这是让VSCode断点生效的关键！
-        sys.modules[module_name] = strategy_module
-        print(f"[DEBUG] 模块已添加到sys.modules: {module_name}")
+            print(f"[DEBUG] 策略安全验证通过: {safe_path}")
 
-        # 确保模块的__file__属性指向正确的源文件
-        strategy_module.__file__ = strategy_file
-        print(f"[DEBUG] 模块__file__属性: {strategy_module.__file__}")
+            # 4. 获取策略文件的绝对路径
+            strategy_file = str(safe_path)
+            print(f"[DEBUG] 策略文件绝对路径: {strategy_file}")
 
-        # 执行模块代码
-        print(f"[DEBUG] 准备执行模块代码")
-        spec.loader.exec_module(strategy_module)
-        print(f"[DEBUG] 模块代码执行完成")
+            # 5. 使用策略文件的实际文件名作为模块名（不含.py扩展名）
+            # 这样debugpy可以正确识别模块
+            module_name = os.path.splitext(os.path.basename(strategy_file))[0]
+            print(f"[DEBUG] 模块名: {module_name}")
 
-        return strategy_module
+            # 6. 创建模块规范
+            spec = importlib.util.spec_from_file_location(module_name, strategy_file)
+            print(f"[DEBUG] spec 创建成功")
+
+            # 7. 创建模块对象
+            strategy_module = importlib.util.module_from_spec(spec)
+            print(f"[DEBUG] 模块对象创建成功")
+
+            # 8. 将模块添加到sys.modules，这样debugpy可以找到它
+            sys.modules[module_name] = strategy_module
+            print(f"[DEBUG] 模块已添加到sys.modules: {module_name}")
+
+            # 9. 确保模块的__file__属性指向正确的源文件
+            strategy_module.__file__ = strategy_file
+            print(f"[DEBUG] 模块__file__属性: {strategy_module.__file__}")
+
+            # 10. 执行模块代码
+            print(f"[DEBUG] 准备执行模块代码")
+            spec.loader.exec_module(strategy_module)
+            print(f"[DEBUG] 模块代码执行完成")
+
+            return strategy_module
+
+        except SecurityError as e:
+            error_msg = f"加载策略失败 - {e.message}"
+            print(f"[ERROR] {error_msg}")
+            if self.trader_callback:
+                self.trader_callback.gui.log_message(error_msg, "ERROR")
+            raise
+
+        except Exception as e:
+            error_msg = f"加载策略异常: {str(e)}"
+            print(f"[ERROR] {error_msg}", exc_info=True)
+            if self.trader_callback:
+                self.trader_callback.gui.log_message(error_msg, "ERROR")
+            raise
         
     def init_trader_and_account(self):
         """初始化交易接口和账户"""
@@ -736,10 +775,21 @@ class KhQuantFramework:
             callback=download_progress
         )
         
-        # 等待下载完成
-        while not download_complete:
-            time.sleep(1)
-            
+        # 等待下载完成 - 使用QEventLoop避免阻塞UI
+        event_loop = QEventLoop()
+
+        def check_download():
+            if download_complete:
+                event_loop.quit()
+                if self.trader_callback:
+                    self.trader_callback.gui.log_message("数据下载完成", "INFO")
+            else:
+                QTimer.singleShot(500, check_download)
+
+        if not download_complete:
+            check_download()
+            event_loop.exec()
+
 
             
     def on_quote_callback(self, data: Dict):
@@ -1061,11 +1111,23 @@ class KhQuantFramework:
             
             if self.trader_callback:
                 self.trader_callback.gui.log_message(f"策略主逻辑执行耗时: {strategy_time:.2f}秒", "INFO")
-                
-            # 保持程序运行
-            while self.is_running:
-                time.sleep(1)
-                
+
+            # 保持程序运行 - 使用QTimer替代阻塞循环
+            self.keep_alive_timer = QTimer()
+            self.keep_alive_timer.setSingleShot(True)
+
+            def check_running():
+                if self.is_running:
+                    # 继续等待，保持程序运行
+                    self.keep_alive_timer.start(1000)  # 每秒检查一次
+                else:
+                    # 运行结束，退出
+                    pass
+
+            self.keep_alive_timer.timeout.connect(check_running)
+            if self.is_running:
+                self.keep_alive_timer.start(1000)
+
         except Exception as e:
             error_msg = "框架运行异常: " + str(e)
             logging.error(error_msg, exc_info=True)
@@ -1131,7 +1193,31 @@ class KhQuantFramework:
                 self.trader_callback.gui.log_message(f"读取股票列表出错: {str(e)}，使用默认股票: 000001.SZ", "ERROR")
         
         return stock_codes
-    
+
+    def _get_trading_days_optimized(self, start_date, end_date):
+        """优化获取交易日列表 - 使用向量化操作替代循环
+
+        Args:
+            start_date: 开始日期 (datetime.date)
+            end_date: 结束日期 (datetime.date)
+
+        Returns:
+            list: 交易日列表
+        """
+        # 生成日期范围
+        date_range = [
+            start_date + datetime.timedelta(days=i)
+            for i in range((end_date - start_date).days + 1)
+        ]
+
+        # 批量判断交易日
+        trading_days = [
+            d for d in date_range
+            if self.tools.is_trade_day(d.strftime("%Y-%m-%d"))
+        ]
+
+        return trading_days
+
     def _check_period_consistency(self):
         """检查数据周期和触发周期的一致性"""
         try:
@@ -1598,17 +1684,10 @@ class KhQuantFramework:
                 # 获取回测日期范围内的所有交易日
                 start_date = datetime.datetime.strptime(self.config.backtest_start, "%Y%m%d").date()
                 end_date = datetime.datetime.strptime(self.config.backtest_end, "%Y%m%d").date()
-                
-                # 获取交易日历（使用KhQuTools的真实交易日判断）
-                current_date = start_date
-                trading_days = []
-                while current_date <= end_date:
-                    # 使用KhQuTools判断是否为真实交易日（排除节假日）
-                    date_str = current_date.strftime("%Y-%m-%d")
-                    if self.tools.is_trade_day(date_str):
-                        trading_days.append(current_date)
-                    current_date += datetime.timedelta(days=1)
-                
+
+                # 使用向量化方式获取交易日历 - 优化版本
+                trading_days = self._get_trading_days_optimized(start_date, end_date)
+
                 if self.trader_callback:
                     self.trader_callback.gui.log_message(f"回测期间共有{len(trading_days)}个交易日", "INFO")
                 
@@ -3036,22 +3115,27 @@ class KhQuantFramework:
     def stop(self):
         """停止框架"""
         self.is_running = False
-        
+
+        # 停止保活定时器
+        if hasattr(self, 'keep_alive_timer') and self.keep_alive_timer:
+            self.keep_alive_timer.stop()
+            self.keep_alive_timer = None
+
         # 记录结束时间（如果还没有记录的话）
         if self.end_time is None:
             self.end_time = time.time()
             if self.start_time is not None:
                 self.total_runtime = self.end_time - self.start_time
-                
+
                 # 记录停止日志
                 if self.trader_callback:
                     end_datetime = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                     self.trader_callback.gui.log_message(f"策略手动停止时间: {end_datetime}", "INFO")
                     self.trader_callback.gui.log_message(f"策略总运行时长: {self._format_runtime(self.total_runtime)}", "INFO")
-        
+
         if self.trader:
             self.trader.stop()
-            
+
     def check_connection(self) -> bool:
         """检查连接状态"""
         # 实现连接检查逻辑
