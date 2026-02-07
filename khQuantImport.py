@@ -77,22 +77,33 @@ def _is_valid_value(value) -> bool:
 
 def _get_tick_compatible_field(stock_data: Dict, field: str):
     """获取tick兼容的字段值，自动处理close/lastPrice映射
-    
+
     对于close字段：先检查是否有lastPrice字段来判断数据类型
     - 有lastPrice → 是tick数据 → 优先返回lastPrice
     - 没有lastPrice → 是K线数据 → 返回close
-    
+
     Args:
         stock_data: 股票数据字典或类似对象
         field: 请求的字段名
-        
+
     Returns:
         字段值，如果不存在或无效返回None
     """
+    # 特殊处理：如果值本身是pandas Series，直接返回
+    # 这通常发生在处理批量数据时
+    if isinstance(stock_data, pd.Series):
+        return stock_data
+
+    # 特殊处理：numpy数组 - 返回最后一个值
+    if isinstance(stock_data, np.ndarray):
+        if stock_data.size > 0:
+            return stock_data[-1]
+        return None
+
     # 检查stock_data是否有get方法或支持in操作
     has_get = hasattr(stock_data, 'get')
     has_contains = hasattr(stock_data, '__contains__')
-    
+
     # 特殊处理：当请求close字段时，先检查是否是tick数据
     # Tick数据同时有close(nan)和lastPrice(有效值)，需要优先读取lastPrice
     if field == 'close':
@@ -102,32 +113,65 @@ def _get_tick_compatible_field(stock_data: Dict, field: str):
             has_lastPrice = stock_data.get('lastPrice') is not None
         elif has_contains:
             has_lastPrice = 'lastPrice' in stock_data
-        
+        elif hasattr(stock_data, 'lastPrice'):
+            # 检查属性访问
+            has_lastPrice = True
+
         if has_lastPrice:
             # 是tick数据，优先返回lastPrice
             try:
                 if has_get:
                     value = stock_data.get('lastPrice')
+                elif hasattr(stock_data, 'lastPrice'):
+                    value = getattr(stock_data, 'lastPrice')
                 else:
                     value = stock_data['lastPrice']
                 if _is_valid_value(value):
                     return value
             except (KeyError, IndexError):
                 pass
-    
-    # 其他情况：正常获取请求的字段
+
+    # 辅助函数：处理值可能是数组的情况
+    def process_value(v):
+        if v is None:
+            return None
+        # 对于numpy数组，返回最后一个值
+        if isinstance(v, np.ndarray):
+            if v.size > 0:
+                return v[-1]
+            return None
+        # 对于pandas Series，返回最后一个值
+        if isinstance(v, pd.Series):
+            if not v.empty:
+                # 返回标量值
+                return float(v.iloc[-1])
+            return None
+        return v
+
+    # 尝试通过get方法获取
     if has_get:
         value = stock_data.get(field)
+        value = process_value(value)
         if _is_valid_value(value):
             return value
-    elif has_contains and field in stock_data:
+
+    # 尝试通过索引获取
+    if has_contains and field in stock_data:
         try:
             value = stock_data[field]
+            value = process_value(value)
             if _is_valid_value(value):
                 return value
         except (KeyError, IndexError):
             pass
-    
+
+    # 尝试通过属性访问获取
+    if hasattr(stock_data, field):
+        value = getattr(stock_data, field)
+        value = process_value(value)
+        if _is_valid_value(value):
+            return value
+
     return None
 
 # ===== 时间标准化类 =====
@@ -261,7 +305,11 @@ class StockDataParser:
         try:
             if value is None:
                 return 0.0
-            return float(value)
+            float_value = float(value)
+            # 检查转换后的值是否为NaN
+            if float_value != float_value:  # NaN的特性
+                return 0.0
+            return float_value
         except (ValueError, TypeError):
             logging.debug(f"无法将 {value} 转换为float")
             return 0.0
