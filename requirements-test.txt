@@ -1,0 +1,30 @@
+# 测试依赖
+# 使用方法: pip install -r requirements-test.txt
+
+# 测试框架
+pytest>=7.0.0
+pytest-cov>=4.0.0
+pytest-benchmark>=4.0.0
+pytest-mock>=3.10.0
+pytest-xdist>=3.0.0  # 并行测试
+pytest-timeout>=2.1.0  # 超时控制
+
+# 代码质量
+flake8>=6.0.0
+pylint>=2.17.0
+black>=23.0.0
+isort>=5.12.0
+
+# 覆盖率
+coverage>=7.0.0
+
+# Mock和测试工具
+responses>=0.23.0
+freezegun>=1.2.2  # 时间mock
+
+# 文档
+sphinx>=6.0.0
+sphinx-rtd-theme>=1.2.0
+
+# CI/CD
+codecov>=2.1.0
