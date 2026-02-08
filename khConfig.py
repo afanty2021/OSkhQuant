@@ -5,10 +5,27 @@ import time
 
 class KhConfig:
     """配置管理类"""
-    
+
+    # ===== 默认提醒配置 =====
+    DEFAULT_ALERT_CONFIG = {
+        "enabled": True,
+        "sound_enabled": True,
+        "wechat_enabled": False,
+        "wechat_key": "",
+        "dedup_interval": 60,
+        "sound_file": ""
+    }
+
+    # ===== 默认实时交易配置 =====
+    DEFAULT_REALTIME_CONFIG = {
+        "enabled": False,
+        "period": "5m",
+        "auto_reconnect": True
+    }
+
     def __init__(self, config_path: str):
         """初始化配置
-        
+
         Args:
             config_path: 配置文件路径
         """
@@ -16,38 +33,52 @@ class KhConfig:
         # 加载配置文件
         with open(config_path, 'r', encoding='utf-8') as f:
             self.config_dict = json.load(f)
-        
+
         # 从根级别或system配置中读取run_mode
         self.run_mode = self.config_dict.get("run_mode") or \
                        self.config_dict.get("system", {}).get("run_mode", "backtest")
         self.userdata_path = self.config_dict.get("system", {}).get("userdata_path", "")
         self.session_id = self.config_dict.get("system", {}).get("session_id", int(time.time()))
         self.check_interval = self.config_dict.get("system", {}).get("check_interval", 3)
-        
+
         # 账户配置，设置默认值
         account_config = self.config_dict.get("account", {})
         self.account_id = account_config.get("account_id", "test_account")
         self.account_type = account_config.get("account_type", "SECURITY_ACCOUNT")
-        
+
         # 回测配置，设置默认值
         backtest_config = self.config_dict.get("backtest", {})
         self.backtest_start = backtest_config.get("start_time", "20240101")
         self.backtest_end = backtest_config.get("end_time", "20241231")
-        
+
         # 从回测配置中获取初始资金
         self.init_capital = backtest_config.get("init_capital", 1000000)
-        
+
         # 数据配置，设置默认值
         data_config = self.config_dict.get("data", {})
         self.kline_period = data_config.get("kline_period", "1d")
         # 优先从stock_list读取，如果没有则使用stock_pool（兼容性）
         self.stock_pool = data_config.get("stock_list", data_config.get("stock_pool", []))
-        
+
         # 风控配置，设置默认值
         risk_config = self.config_dict.get("risk", {})
         self.position_limit = risk_config.get("position_limit", 0.95)
         self.order_limit = risk_config.get("order_limit", 100)
         self.loss_limit = risk_config.get("loss_limit", 0.1)
+
+        # 提醒配置，设置默认值
+        alert_config = self.config_dict.get("alert", {})
+        self.alert_enabled = alert_config.get("enabled", True)
+        self.sound_enabled = alert_config.get("sound_enabled", True)
+        self.wechat_enabled = alert_config.get("wechat_enabled", False)
+        self.wechat_key = alert_config.get("wechat_key", "")
+        self.dedup_interval = alert_config.get("dedup_interval", 60)
+
+        # 实时交易配置，设置默认值
+        realtime_config = self.config_dict.get("realtime", {})
+        self.realtime_enabled = realtime_config.get("enabled", False)
+        self.realtime_period = realtime_config.get("period", "5m")
+        self.auto_reconnect = realtime_config.get("auto_reconnect", True)
         
     @property
     def initial_cash(self):

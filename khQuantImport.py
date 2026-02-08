@@ -44,6 +44,36 @@ from khFrame import KhQuantFramework
 import MyTT as _mytt
 from MyTT import *  # 暴露 MA/RSI 等指标函数
 
+# ===== 提醒管理模块（可选导入） =====
+try:
+    from khAlertManager import (
+        KhAlertManager, SoundAlert, WeChatAlert,
+        AlertType, AlertDirection,
+        create_alert_manager
+    )
+    HAS_ALERT_MANAGER = True
+except ImportError:
+    HAS_ALERT_MANAGER = False
+    KhAlertManager = None
+    SoundAlert = None
+    WeChatAlert = None
+    AlertType = None
+    AlertDirection = None
+    create_alert_manager = None
+
+# ===== 实时交易模块（可选导入） =====
+try:
+    from khRealtimeTrader import (
+        RealtimeTrader, create_realtime_trader,
+        _TraderCallback
+    )
+    HAS_REALTIME_TRADER = True
+except ImportError:
+    HAS_REALTIME_TRADER = False
+    RealtimeTrader = None
+    create_realtime_trader = None
+    _TraderCallback = None
+
 # ===== Tick数据字段映射 =====
 # Tick数据和K线数据字段名不同，需要映射
 # K线数据使用 'close'，Tick数据使用 'lastPrice'
@@ -612,7 +642,16 @@ __all__ = [
     'get_default_risk_params',
 
     # 指标函数（MyTT）与项目内均线
-    'MA', 'RSI', 'khMA'
+    'MA', 'RSI', 'khMA',
+
+    # 提醒管理模块
+    'KhAlertManager', 'SoundAlert', 'WeChatAlert',
+    'AlertType', 'AlertDirection', 'create_alert_manager',
+    'HAS_ALERT_MANAGER',
+
+    # 实时交易模块
+    'RealtimeTrader', 'create_realtime_trader',
+    'HAS_REALTIME_TRADER',
 ]
 
 # 自动并入 khQTTools 与 MyTT 的所有公共符号，便于 from khQuantImport import * 统一入口

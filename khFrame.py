@@ -581,6 +581,35 @@ class KhQuantFramework:
         
         # 初始化风控管理器
         self.risk_mgr = KhRiskManager(self.config)
+
+        # ===== 实时交易和提醒模块初始化 =====
+        self.alert_mgr = None  # 提醒管理器
+        self.realtime_trader = None  # 实时交易引擎
+
+    def init_alert_manager(self):
+        """初始化提醒管理器"""
+        try:
+            from khAlertManager import KhAlertManager
+
+            alert_config = {
+                "enabled": getattr(self.config, 'alert_enabled', True),
+                "sound_enabled": getattr(self.config, 'sound_enabled', True),
+                "wechat_enabled": getattr(self.config, 'wechat_enabled', False),
+                "wechat_key": getattr(self.config, 'wechat_key', ''),
+                "dedup_interval": getattr(self.config, 'dedup_interval', 60)
+            }
+
+            self.alert_mgr = KhAlertManager(alert_config)
+
+            # 将提醒管理器传递给交易管理器
+            self.trade_mgr.set_alert_manager(self.alert_mgr)
+
+            if self.trader_callback:
+                self.trader_callback.gui.log_message("提醒管理器初始化完成", "INFO")
+
+        except Exception as e:
+            if self.trader_callback:
+                self.trader_callback.gui.log_message(f"初始化提醒管理器失败: {e}", "WARNING")
         
     def _log(self, message, level="INFO"):
         """根据是否存在回调函数选择日志记录方式"""
@@ -1097,16 +1126,23 @@ class KhQuantFramework:
                 self.trader_callback.gui.log_message(f"策略初始化耗时: {strategy_init_time:.2f}秒", "INFO")
             
             self.is_running = True
-            
+
             # 记录预处理总耗时
             preprocess_time = time.time() - self.start_time
             if self.trader_callback:
                 self.trader_callback.gui.log_message(f"预处理阶段总耗时: {preprocess_time:.2f}秒", "INFO")
                 self.trader_callback.gui.log_message("开始执行策略主逻辑...", "INFO")
-            
-            # 固定运行回测模式
+
+            # 根据运行模式选择不同的执行方式
             strategy_start = time.time()
-            self._run_backtest()
+
+            if self.run_mode == "realtime_trade":
+                # 实时交易模式
+                self._run_realtime_trade(stock_codes)
+            else:
+                # 回测/模拟模式（默认）
+                self._run_backtest()
+
             strategy_time = time.time() - strategy_start
             
             if self.trader_callback:
@@ -1327,10 +1363,75 @@ class KhQuantFramework:
         except Exception as e:
             # 检查过程中出现异常，记录但不影响回测继续运行
             if self.trader_callback:
-                self.trader_callback.gui.log_message(f"周期一致性检查时出错: {str(e)}", "WARNING") 
+                self.trader_callback.gui.log_message(f"周期一致性检查时出错: {str(e)}", "WARNING")
             else:
                 print(f"周期一致性检查时出错: {str(e)}")
-        
+
+    def _run_realtime_trade(self, stock_codes: List[str]):
+        """实时交易模式
+
+        Args:
+            stock_codes: 股票列表
+        """
+        try:
+            if self.trader_callback:
+                self.trader_callback.gui.log_message("启动实时交易模式...", "INFO")
+
+            # 初始化提醒管理器
+            self.init_alert_manager()
+
+            # 检查是否启用了实时交易
+            if not getattr(self.config, 'realtime_enabled', False):
+                if self.trader_callback:
+                    self.trader_callback.gui.log_message("实时交易功能未在配置中启用", "WARNING")
+                return
+
+            # 导入实时交易引擎
+            try:
+                from khRealtimeTrader import RealtimeTrader
+            except ImportError as e:
+                if self.trader_callback:
+                    self.trader_callback.gui.log_message(f"导入实时交易引擎失败: {e}", "ERROR")
+                return
+
+            # 获取策略文件路径
+            strategy_file = self.config.config_dict.get("strategy_file", "")
+
+            # 配置实时交易参数
+            realtime_config = {
+                "path": self.config.userdata_path,
+                "stock_list": stock_codes,
+                "period": getattr(self.config, 'realtime_period', '5m'),
+                "auto_reconnect": getattr(self.config, 'auto_reconnect', True)
+            }
+
+            # 创建实时交易引擎
+            self.realtime_trader = RealtimeTrader(
+                config=realtime_config,
+                strategy_file=strategy_file,
+                alert_manager=self.alert_mgr
+            )
+
+            if self.trader_callback:
+                self.trader_callback.gui.log_message(
+                    f"实时交易引擎已创建，监控 {len(stock_codes)} 只股票",
+                    "INFO"
+                )
+
+            # 启动实时交易
+            if self.realtime_trader.start():
+                if self.trader_callback:
+                    self.trader_callback.gui.log_message("实时交易引擎已启动", "INFO")
+            else:
+                if self.trader_callback:
+                    self.trader_callback.gui.log_message("实时交易引擎启动失败", "ERROR")
+
+        except Exception as e:
+            error_msg = f"实时交易模式运行异常: {str(e)}"
+            logging.error(error_msg, exc_info=True)
+            if self.trader_callback:
+                self.trader_callback.gui.log_message(error_msg, "ERROR")
+
     def _run_backtest(self):
         """回测模式"""
         try:

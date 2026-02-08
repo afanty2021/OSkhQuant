@@ -201,6 +201,7 @@ class KhQuantGUI(QMainWindow):
     update_status_signal = pyqtSignal(str, str)
     show_backtest_result_signal = pyqtSignal(str)  # 添加新信号
     progress_signal = pyqtSignal(int)  # 添加进度条信号
+    show_alert_signal = pyqtSignal(dict)  # 提醒信号，传递提醒信息字典
     
     def __init__(self):
         super().__init__()
@@ -268,6 +269,7 @@ class KhQuantGUI(QMainWindow):
         self.update_status_signal.connect(self._update_status_table, Qt.QueuedConnection)
         self.show_backtest_result_signal.connect(self.show_backtest_result, Qt.QueuedConnection)
         self.progress_signal.connect(self.update_progress_bar, Qt.QueuedConnection)
+        self.show_alert_signal.connect(self._on_show_alert, Qt.QueuedConnection)
         
         # 设置定时器定期刷新日志缓冲区
         self.log_flush_timer = QTimer()
@@ -3420,8 +3422,63 @@ class KhQuantGUI(QMainWindow):
                 border: 1px solid #404040;
             }
         """)
-        
+
         msg_box.exec_()
+
+    def _on_show_alert(self, alert_data):
+        """处理提醒信号并显示弹窗
+
+        Args:
+            alert_data: 提醒信息字典，包含:
+                - type: 提醒类型（'buy', 'sell', 'warning'）
+                - stock_code: 股票代码
+                - direction: 买卖方向
+                - price: 触发价格
+                - reason: 触发原因
+        """
+        try:
+            alert_type = alert_data.get('type', 'info')
+            stock_code = alert_data.get('stock_code', '')
+            direction = alert_data.get('direction', '')
+            price = alert_data.get('price', 0.0)
+            reason = alert_data.get('reason', '')
+
+            # 根据类型设置不同的图标和标题
+            if direction.lower() == 'buy':
+                icon = QMessageBox.Information
+                title = f"【买入提醒】{stock_code}"
+                message = f"触发买入信号\n\n股票: {stock_code}\n价格: {price:.2f}"
+            elif direction.lower() == 'sell':
+                icon = QMessageBox.Warning
+                title = f"【卖出提醒】{stock_code}"
+                message = f"触发卖出信号\n\n股票: {stock_code}\n价格: {price:.2f}"
+            else:
+                icon = QMessageBox.Information
+                title = "交易提醒"
+                message = f"股票: {stock_code}\n价格: {price:.2f}"
+
+            if reason:
+                message += f"\n原因: {reason}"
+
+            # 显示提醒弹窗
+            msg_box = QMessageBox(self)
+            msg_box.setIcon(icon)
+            msg_box.setWindowTitle(title)
+            msg_box.setText(message)
+
+            # 添加声音提醒
+            if direction.lower() == 'buy':
+                msg_box.setInformativeText("播放买入提示音")
+            elif direction.lower() == 'sell':
+                msg_box.setInformativeText("播放卖出提示音")
+
+            msg_box.exec_()
+
+            # 记录日志
+            self.log_message(f"提醒已显示: {title} @ {price:.2f}", "INFO")
+
+        except Exception as e:
+            self.log_message(f"显示提醒弹窗失败: {str(e)}", "ERROR")
 
     def on_strategy_error(self, error_msg, error):
         """策略错误处理"""

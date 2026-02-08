@@ -16,6 +16,9 @@ class KhTradeManager:
         self.assets = {}  # 资产管理
         self.trades = {}  # 成交管理
         self.positions = {}  # 持仓管理
+
+        # 提醒管理器（可选）
+        self.alert_manager = None
         
         # 获取交易成本配置
         trade_cost = self.config.config_dict.get("backtest", {}).get("trade_cost", {})
@@ -41,7 +44,16 @@ class KhTradeManager:
         
         # T+0交易模式标识（默认关闭）
         self.t0_mode = False
-    
+
+    def set_alert_manager(self, alert_manager):
+        """
+        设置提醒管理器
+
+        Args:
+            alert_manager: KhAlertManager实例
+        """
+        self.alert_manager = alert_manager
+
     def set_price_decimals(self, decimals: int):
         """设置价格精度
         
@@ -195,9 +207,9 @@ class KhTradeManager:
         
         return actual_price, total_cost
 
-    def process_signals(self, signals: List[Dict]):
+    def process_signals(self, signals: List[Dict], is_realtime: bool = False):
         """处理交易信号
-        
+
         Args:
             signals: 交易信号列表，每个信号字典包含以下字段：
             {
@@ -213,6 +225,7 @@ class KhTradeManager:
                 "order_time": str, # 可选，委托时间，格式"HH:MM:SS"
                 "remark": str      # 可选，备注信息
             }
+            is_realtime: 是否为实盘模式（触发提醒）
         """
         for signal in signals:
             # 跳过数量为0的交易信号
@@ -222,6 +235,18 @@ class KhTradeManager:
                 if self.callback:
                     self.callback.gui.log_message(error_msg, "WARNING")
                 continue
+
+            # 实盘模式下触发提醒
+            if is_realtime and self.alert_manager:
+                # 构建提醒信号
+                alert_signal = {
+                    "stock_code": signal.get("code", ""),
+                    "direction": signal.get("action", ""),
+                    "price": signal.get("price", 0.0),
+                    "reason": signal.get("reason", ""),
+                    "volume": signal.get("volume", 0)
+                }
+                self.alert_manager.on_signal(alert_signal)
                 
             # 计算交易成本
             direction = "buy" if signal["action"].lower() == "buy" else "sell"
