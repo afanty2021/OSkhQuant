@@ -5,8 +5,13 @@ import multiprocessing
 from datetime import datetime, time
 from queue import Empty
 import time as time_module
-from PyQt5.QtWidgets import (QApplication, QMainWindow, QHBoxLayout, QVBoxLayout, 
-                             QWidget, QGroupBox, QCheckBox, QGridLayout, QTextEdit, 
+from logging_config import get_module_logger
+
+# 日志系统
+logger = get_module_logger(__name__)
+
+from PyQt5.QtWidgets import (QApplication, QMainWindow, QHBoxLayout, QVBoxLayout,
+                             QWidget, QGroupBox, QCheckBox, QGridLayout, QTextEdit,
                              QPushButton, QStatusBar, QProgressBar, QLabel, QTimeEdit,
                              QMessageBox, QDesktopWidget, QSplitter, QComboBox, QFileDialog,
                              QSizePolicy)
@@ -64,9 +69,9 @@ def supplement_data_worker(params, progress_queue, result_queue, stop_event):
                 try:
                     progress_queue.put(('progress', percent), timeout=1)
                     last_progress_time = current_time
-                    print(f"[定时补充进程] 发送进度: {percent}%")
+                    logger.info(f"[定时补充进程] 发送进度: {percent}%")
                 except Exception as e:
-                    print(f"[定时补充进程] 发送进度失败: {e}")
+                    logger.error(f"[定时补充进程] 发送进度失败: {e}")
         
         def log_callback(message):
             nonlocal last_status_time
@@ -82,9 +87,9 @@ def supplement_data_worker(params, progress_queue, result_queue, stop_event):
                 try:
                     progress_queue.put(('status', str(message)), timeout=1)
                     last_status_time = current_time
-                    print(f"[定时补充进程] 发送状态: {message}")
+                    logger.info(f"[定时补充进程] 发送状态: {message}")
                 except Exception as e:
-                    print(f"[定时补充进程] 发送状态失败: {e}")
+                    logger.error(f"[定时补充进程] 发送状态失败: {e}")
         
         def check_interrupt():
             # 检查停止事件
@@ -104,7 +109,7 @@ def supplement_data_worker(params, progress_queue, result_queue, stop_event):
             check_interrupt=check_interrupt
         )
         
-        print(f"[定时补充进程] 数据补充函数执行完成")
+        logger.info(f"[定时补充进程] 数据补充函数执行完成")
         
         # 发送完成信号
         result_queue.put(('success', '定时数据补充完成！'))
@@ -1797,7 +1802,7 @@ class GUIScheduler(QMainWindow):
         scrollbar.setValue(scrollbar.maximum())
         
         # 同时输出到控制台
-        print(log_entry)
+        logger.info(log_entry)
     
     def clear_log(self):
         """清空日志"""

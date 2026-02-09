@@ -1,7 +1,13 @@
 # coding: utf-8
+import logging
+from logging_config import get_module_logger
 from typing import Dict, List, Optional
 import datetime
 from types import SimpleNamespace
+
+# 日志系统
+logger = get_module_logger(__name__)
+
 
 from xtquant.xttrader import XtQuantTraderCallback
 from xtquant import xtconstant
@@ -70,25 +76,25 @@ class KhTradeManager:
         """
         self.t0_mode = enabled
         if enabled:
-            print("T+0交易模式已启用：当天买入的股票可当天卖出")
+            logger.info("T+0交易模式已启用：当天买入的股票可当天卖出")
         else:
-            print("T+1交易模式：当天买入的股票需等下一交易日才能卖出")
+            logger.info("T+1交易模式：当天买入的股票需等下一交易日才能卖出")
 
     def init(self):
         """初始化交易管理"""
         # 初始化逻辑可以放在这里
-        print("交易管理初始化完成")
-        print(f"交易成本设置:")
-        print(f"  最低佣金: {self.min_commission}元")
-        print(f"  佣金比例: {self.commission_rate*100}%")
-        print(f"  印花税率: {self.stamp_tax_rate*100}%")
-        print(f"  流量费: {self.flow_fee}元/笔")
-        print(f"  滑点类型: {self.slippage['type']}")
+        logger.info("交易管理初始化完成")
+        logger.info(f"交易成本设置:")
+        logger.info(f"  最低佣金: {self.min_commission}元")
+        logger.info(f"  佣金比例: {self.commission_rate*100}%")
+        logger.info(f"  印花税率: {self.stamp_tax_rate*100}%")
+        logger.info(f"  流量费: {self.flow_fee}元/笔")
+        logger.info(f"  滑点类型: {self.slippage['type']}")
         if self.slippage['type'] == 'tick':
-            print(f"  最小变动价: {self.slippage['tick_size']}元（{self.slippage['tick_count']}跳）")
-            print(f"  实际滑点值: {self.slippage['tick_size'] * self.slippage['tick_count']}元")
+            logger.info(f"  最小变动价: {self.slippage['tick_size']}元（{self.slippage['tick_count']}跳）")
+            logger.info(f"  实际滑点值: {self.slippage['tick_size'] * self.slippage['tick_count']}元")
         else:
-            print(f"  滑点比例: {self.slippage['ratio']*100}%")
+            logger.info(f"  滑点比例: {self.slippage['ratio']*100}%")
         
     def calculate_slippage(self, price, direction):
         """
@@ -231,7 +237,7 @@ class KhTradeManager:
             # 跳过数量为0的交易信号
             if signal["volume"] <= 0:
                 error_msg = f"交易数量为0或负数，忽略交易信号 - 股票: {signal['code']}, 方向: {signal['action']}, 数量: {signal['volume']}"
-                print(f"[WARNING] {error_msg}")
+                logger.error(f"[WARNING] {error_msg}")
                 if self.callback:
                     self.callback.gui.log_message(error_msg, "WARNING")
                 continue
@@ -281,13 +287,13 @@ class KhTradeManager:
     def _place_order_live(self, signal: Dict):
         """实盘下单逻辑"""
         # 调用miniQMT的交易接口
-        print(f"实盘下单信号: {signal}")
+        logger.info(f"实盘下单信号: {signal}")
         # 这里需要调用实际的交易接口
         
     def _place_order_simulate(self, signal: Dict):
         """模拟下单逻辑"""
         # 模拟下单逻辑
-        print(f"模拟下单信号: {signal}")
+        logger.info(f"模拟下单信号: {signal}")
         # 更新模拟数据字典
         self.update_dic(signal)
         
@@ -319,7 +325,7 @@ class KhTradeManager:
                         f"可用资金: {self.assets['cash']:.{decimals}f}"
                     )
                     # 记录错误信息到日志
-                    print(f"[ERROR] {error_msg}")
+                    logger.error(f"[ERROR] {error_msg}")
                     if self.callback:
                         self.callback.gui.log_message(error_msg, "ERROR")
                         # 触发委托错误回调
@@ -338,7 +344,7 @@ class KhTradeManager:
                 if available_volume < signal["volume"]:
                     error_msg = f"可用持仓不足 - 需要: {signal['volume']}股, 可用: {available_volume}股"
                     # 记录错误信息到日志
-                    print(f"[ERROR] {error_msg}")
+                    logger.error(f"[ERROR] {error_msg}")
                     if self.callback:
                         self.callback.gui.log_message(error_msg, "ERROR")
                         # 触发委托错误回调
@@ -507,10 +513,10 @@ class KhTradeManager:
                 )
                 self.callback.gui.log_message(cost_msg, "TRADE")
             
-            print(f"回测下单完成: {signal}")
-            print(f"交易成本: {trade_cost:.2f}")
-            print(f"当前资产 (现金): {self.assets['cash']:.{decimals}f}") # 只打印现金，总资产依赖市值
-            print(f"当前持仓: {self.positions}")
+            logger.info(f"回测下单完成: {signal}")
+            logger.info(f"交易成本: {trade_cost:.2f}")
+            logger.info(f"当前资产 (现金): {self.assets['cash']:.{decimals}f}")
+            logger.info(f"当前持仓: {self.positions}")
             
             # 触发回调 (委托和成交)
             if self.callback:
@@ -520,7 +526,7 @@ class KhTradeManager:
                 # 资产和持仓回调在资产/持仓实际变化时触发
                 
         except Exception as e:
-            print(f"回测下单异常: {str(e)}")
+            logger.exception(f"回测下单异常: {str(e)}")
             if self.callback:
                 # 触发委托错误回调
                 self.callback.on_order_error(SimpleNamespace(
@@ -533,29 +539,29 @@ class KhTradeManager:
     def update_dic(self, signal: Dict):
         """更新数据字典"""
         # 更新资产、委托、成交和持仓数据字典
-        print(f"更新数据字典: {signal}")
+        logger.info(f"更新数据字典: {signal}")
         
     def on_order(self, order):
         """委托回报处理"""
-        print(f"委托回报: {order}")
+        logger.info(f"委托回报: {order}")
         self.orders[order.order_id] = order
         
     def on_trade(self, trade):
         """成交回报处理"""
-        print(f"成交回报: {trade}")
+        logger.info(f"成交回报: {trade}")
         self.trades[trade.trade_id] = trade
         
     def on_order_error(self, error):
         """委托错误处理"""
-        print(f"[ERROR] Order Error: {error.error_msg}")
+        logger.error(f"[ERROR] Order Error: {error.error_msg}")
         
     def on_cancel_error(self, cancel_error):
         """撤单错误处理"""
-        print(f"[ERROR] Cancel Error: {cancel_error.error_msg}")
+        logger.error(f"[ERROR] Cancel Error: {cancel_error.error_msg}")
         
     def on_order_stock_async_response(self, response):
         """异步下单回报处理"""
-        print(f"异步下单回报: {response}")
+        logger.info(f"异步下单回报: {response}")
 
     def process_trade_signal(self, signal):
         """处理交易信号"""
@@ -610,7 +616,7 @@ class KhTradeManager:
                 self.callback.on_stock_position(SimpleNamespace(**self.positions[signal["code"]]))
                 
         except Exception as e:
-            print(f"处理交易信号时出错: {str(e)}")
+            logger.info(f"处理交易信号时出错: {str(e)}")
             if self.callback:
                 self.callback.on_order_error(SimpleNamespace(
                     stock_code=signal["code"],

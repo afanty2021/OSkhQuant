@@ -1,4 +1,9 @@
 import logging
+from logging_config import get_module_logger
+
+# 日志系统
+logger = get_module_logger(__name__)
+
 logging.getLogger('matplotlib').setLevel(logging.ERROR)
 
 # 先导入 matplotlib 并设置后端
@@ -44,7 +49,7 @@ class BacktestResultWindow(QMainWindow):
         # 从设置读取无风险收益率
         settings = QSettings('KHQuant', 'StockAnalyzer')
         self.risk_free_rate = float(settings.value('risk_free_rate', '0.03'))
-        print(f"使用无风险收益率: {self.risk_free_rate}")
+        logger.info(f"使用无风险收益率: {self.risk_free_rate}")
         
         # 设置窗口标题栏颜色（仅适用于Windows）
         if sys.platform == 'win32':
@@ -72,7 +77,7 @@ class BacktestResultWindow(QMainWindow):
                     sizeof(caption_color)
                 )
             except Exception as e:
-                print(f"设置标题栏深色模式失败: {str(e)}")
+                logger.error(f"设置标题栏深色模式失败: {str(e)}")
         
         # 设置窗口标题
         self.setWindowTitle("回测结果分析")
@@ -93,12 +98,12 @@ class BacktestResultWindow(QMainWindow):
             
             if os.path.exists(icon_path):
                 self.setWindowIcon(QIcon(icon_path))
-                print(f"成功加载图标: {icon_path}")
+                logger.info(f"成功加载图标: {icon_path}")
                 return True
                 
             
         except Exception as e:
-            print(f"加载图标时出错: {str(e)}")
+            logger.info(f"加载图标时出错: {str(e)}")
             return False
     
     def detect_screen_resolution(self):
@@ -660,7 +665,7 @@ class BacktestResultWindow(QMainWindow):
                 # 重绘图表
                 self.chart_view.draw_idle()
         except Exception as e:
-            print(f"调整图表布局时出错: {str(e)}")
+            logger.info(f"调整图表布局时出错: {str(e)}")
         
     def load_data(self):
         """加载回测数据"""
@@ -678,13 +683,13 @@ class BacktestResultWindow(QMainWindow):
             time.sleep(1)
             
             # 打印调试信息
-            print(f"尝试加载配置文件: {config_path}") 
-            print(f"文件是否存在: {os.path.exists(config_path)}")
+            logger.info(f"尝试加载配置文件: {config_path}")
+            logger.info(f"文件是否存在: {os.path.exists(config_path)}")
             
             # 尝试列出目录内容
-            print("目录内容:")
+            logger.info("目录内容:")
             for file in os.listdir(backtest_dir):
-                print(f"- {file}")
+                logger.info(f"- {file}")
             
             if not os.path.exists(config_path):
                 raise FileNotFoundError(f"配置文件不存在: {config_path}")
@@ -699,32 +704,32 @@ class BacktestResultWindow(QMainWindow):
             
             # 检查文件是否存在
             if not os.path.exists(trades_path):
-                print(f"警告: 交易记录文件不存在: {trades_path}")
+                logger.warning(f"警告: 交易记录文件不存在: {trades_path}")
                 trades_df = pd.DataFrame(columns=['datetime', 'code', 'action', 'price', 'volume', 'amount', 'commission'])
             else:
                 trades_df = pd.read_csv(trades_path, encoding='utf-8-sig')
             
             if not os.path.exists(daily_stats_path):
-                print(f"警告: 每日统计文件不存在: {daily_stats_path}")
+                logger.warning(f"警告: 每日统计文件不存在: {daily_stats_path}")
                 daily_stats_df = pd.DataFrame(columns=['date', 'total_asset', 'cash', 'market_value', 'daily_return'])
             else:
                 daily_stats_df = pd.read_csv(daily_stats_path, encoding='utf-8-sig')
                 
                 # 检查并计算daily_return列
                 if 'daily_return' not in daily_stats_df.columns and 'total_asset' in daily_stats_df.columns:
-                    print("daily_stats.csv中没有daily_return列，正在计算...")
+                    logger.info("daily_stats.csv中没有daily_return列，正在计算...")
                     # 确保日期列是日期类型，并按日期排序
                     daily_stats_df['date'] = pd.to_datetime(daily_stats_df['date'])
                     daily_stats_df = daily_stats_df.sort_values('date')
                     # 计算每日收益率
                     daily_stats_df['daily_return'] = daily_stats_df['total_asset'].pct_change()
-                    print(f"已计算daily_return列，共{len(daily_stats_df)}条数据")
+                    logger.info(f"已计算daily_return列，共{len(daily_stats_df)}条数据")
                     # 替换第一行的NaN值为0
                     daily_stats_df['daily_return'].iloc[0] = 0
             
             # 处理基准数据文件
             if not os.path.exists(benchmark_path):
-                print(f"警告: 基准数据文件不存在: {benchmark_path}")
+                logger.warning(f"警告: 基准数据文件不存在: {benchmark_path}")
                 # 创建一个假的基准数据DataFrame，与daily_stats_df具有相同的日期范围
                 if len(daily_stats_df) > 0 and 'date' in daily_stats_df.columns:
                     # 将日期列转换为datetime
@@ -739,17 +744,17 @@ class BacktestResultWindow(QMainWindow):
                         'date': dates,
                         'close': closes
                     })
-                    print("创建了替代基准数据")
+                    logger.info("创建了替代基准数据")
                 else:
                     # 如果没有每日统计数据，则创建一个空的基准数据DataFrame
                     benchmark_df = pd.DataFrame(columns=['date', 'close'])
-                    print("创建了空的基准数据DataFrame")
+                    logger.info("创建了空的基准数据DataFrame")
             else:
                 try:
                     benchmark_df = pd.read_csv(benchmark_path, encoding='utf-8-sig')
                     # 检查基准数据是否为空
                     if len(benchmark_df) == 0 or 'close' not in benchmark_df.columns or 'date' not in benchmark_df.columns:
-                        print("基准数据文件为空或缺少必要列")
+                        logger.info("基准数据文件为空或缺少必要列")
                         # 创建同样的替代数据
                         if len(daily_stats_df) > 0 and 'date' in daily_stats_df.columns:
                             daily_stats_df['date'] = pd.to_datetime(daily_stats_df['date'])
@@ -759,12 +764,12 @@ class BacktestResultWindow(QMainWindow):
                                 'date': dates,
                                 'close': closes
                             })
-                            print("创建了替代基准数据")
+                            logger.info("创建了替代基准数据")
                         else:
                             benchmark_df = pd.DataFrame(columns=['date', 'close'])
-                            print("创建了空的基准数据DataFrame")
+                            logger.info("创建了空的基准数据DataFrame")
                 except Exception as e:
-                    print(f"读取基准数据文件时出错: {str(e)}")
+                    logger.info(f"读取基准数据文件时出错: {str(e)}")
                     # 创建同样的替代数据
                     if len(daily_stats_df) > 0 and 'date' in daily_stats_df.columns:
                         daily_stats_df['date'] = pd.to_datetime(daily_stats_df['date'])
@@ -774,10 +779,10 @@ class BacktestResultWindow(QMainWindow):
                             'date': dates,
                             'close': closes
                         })
-                        print("创建了替代基准数据")
+                        logger.info("创建了替代基准数据")
                     else:
                         benchmark_df = pd.DataFrame(columns=['date', 'close'])
-                        print("创建了空的基准数据DataFrame")
+                        logger.info("创建了空的基准数据DataFrame")
             
             # 检查必要的列是否存在
             required_columns = {
@@ -793,30 +798,30 @@ class BacktestResultWindow(QMainWindow):
                 trades_df = trades_df.rename(columns={'type': 'action'})
             
             # 输出调试信息
-            print(f"交易数据列名: {trades_df.columns.tolist()}")
+            logger.info(f"交易数据列名: {trades_df.columns.tolist()}")
             
             for df_name, columns in required_columns.items():
                 df = locals()[f"{df_name}_df"]
                 missing_columns = [col for col in columns if col not in df.columns]
                 if missing_columns:
-                    print(f"警告: {df_name} 缺少必要的列: {missing_columns}，尝试调整")
+                    logger.warning(f"警告: {df_name} 缺少必要的列: {missing_columns}，尝试调整")
                     # 对于trades，尝试修复最常见的列名问题
                     if df_name == 'trades':
                         if 'datetime' not in df.columns and 'time' in df.columns:
-                            print(f"  将'time'列重命名为'datetime'")
+                            logger.info(f"  将'time'列重命名为'datetime'")
                             df = df.rename(columns={'time': 'datetime'})
                         if 'action' not in df.columns and 'direction' in df.columns:
-                            print(f"  将'direction'列重命名为'action'")
+                            logger.info(f"  将'direction'列重命名为'action'")
                             df = df.rename(columns={'direction': 'action'})
                         if 'action' not in df.columns and 'type' in df.columns:
-                            print(f"  将'type'列重命名为'action'")
+                            logger.info(f"  将'type'列重命名为'action'")
                             df = df.rename(columns={'type': 'action'})
                         missing_columns = [col for col in columns if col not in df.columns]
                         if missing_columns:
-                            print(f"  调整后仍缺少列: {missing_columns}")
+                            logger.info(f"  调整后仍缺少列: {missing_columns}")
                             if set(missing_columns) == {'commission'} and 'amount' in df.columns:
                                 # 如果只缺少commission列，则添加一个全为0的列
-                                print(f"  添加默认的'commission'列")
+                                logger.info(f"  添加默认的'commission'列")
                                 df['commission'] = 0.0
                                 missing_columns = []
                             trades_df = df
@@ -831,7 +836,7 @@ class BacktestResultWindow(QMainWindow):
             })
             
             # 输出调试信息
-            print(f"重命名后的交易数据列名: {trades_df.columns.tolist()}")
+            logger.info(f"重命名后的交易数据列名: {trades_df.columns.tolist()}")
             
             try:
                 # 将买卖动作映射为中文
@@ -840,10 +845,10 @@ class BacktestResultWindow(QMainWindow):
                     'sell': '卖出'
                 }
                 trades_df['direction'] = trades_df['direction'].map(lambda x: direction_map.get(str(x).lower(), x))
-                print("买卖动作映射完成")
+                logger.info("买卖动作映射完成")
             except Exception as e:
-                print(f"买卖动作映射出错: {str(e)}")
-                print(f"direction列值: {trades_df['direction'].unique().tolist() if 'direction' in trades_df.columns else 'direction列不存在'}")
+                logger.info(f"买卖动作映射出错: {str(e)}")
+                logger.info(f"direction列值: {trades_df['direction'].unique().tolist() if 'direction' in trades_df.columns else 'direction列不存在'}")
             
             # 更新基本信息
             self.update_basic_info(config_df.iloc[0], daily_stats_df)
@@ -861,10 +866,10 @@ class BacktestResultWindow(QMainWindow):
             self.update_performance_charts(daily_stats_df, benchmark_df)
             
         except Exception as e:
-            print(f"加载回测数据时出错: {str(e)}")
-            print(f"当前工作目录: {os.getcwd()}")
+            logger.info(f"加载回测数据时出错: {str(e)}")
+            logger.info(f"当前工作目录: {os.getcwd()}")
             import traceback
-            print(traceback.format_exc())
+            logger.debug(traceback.format_exc())
 
     def set_value_color(self, label, value_str, numeric_value):
         """根据数值正负设置颜色：正数红色，负数绿色"""
@@ -935,10 +940,10 @@ class BacktestResultWindow(QMainWindow):
                     # 如果交易日计算失败，则使用日历天数作为备选方案
                     if trade_days_count <= 0:
                         days = (pd.to_datetime(last_date) - pd.to_datetime(first_date)).days
-                        print(f"警告：无法获取交易日天数，使用日历天数 {days} 作为替代")
+                        logger.warning(f"警告：无法获取交易日天数，使用日历天数 {days} 作为替代")
                     else:
                         days = trade_days_count
-                        print(f"使用交易日天数: {days}")
+                        logger.info(f"使用交易日天数: {days}")
                     
                     if days > 0 and init_capital > 0:
                         # 使用公式 ((1+R)^(250/n)-1)*100% 计算年化收益率
@@ -960,17 +965,17 @@ class BacktestResultWindow(QMainWindow):
                     daily_returns = daily_stats_df['daily_return']
                     
                     # 添加调试输出
-                    print(f"daily_returns数据类型: {type(daily_returns)}")
-                    print(f"daily_returns长度: {len(daily_returns)}")
-                    print(f"daily_returns是否包含NaN: {daily_returns.isna().any()}")
-                    print(f"daily_returns非NaN值的数量: {daily_returns.count()}")
-                    print(f"daily_returns前5个值: {daily_returns.head(5).tolist()}")
+                    logger.info(f"daily_returns数据类型: {type(daily_returns)}")
+                    logger.info(f"daily_returns长度: {len(daily_returns)}")
+                    logger.info(f"daily_returns是否包含NaN: {daily_returns.isna().any()}")
+                    logger.info(f"daily_returns非NaN值的数量: {daily_returns.count()}")
+                    logger.info(f"daily_returns前5个值: {daily_returns.head(5).tolist()}")
                     
                     sharpe_ratio = self.calculate_sharpe_ratio(daily_returns)
                     self.set_value_color(self.info_labels["夏普比率"], f"{sharpe_ratio:+.2f}", sharpe_ratio)
                 else:
                     self.set_value_color(self.info_labels["夏普比率"], "0.00", 0)
-                    print("警告: daily_stats_df中没有'daily_return'列")
+                    logger.warning("警告: daily_stats_df中没有'daily_return'列")
                 
                 # 计算索提诺比率
                 if 'daily_return' in daily_stats_df.columns:
@@ -1000,7 +1005,7 @@ class BacktestResultWindow(QMainWindow):
                                 self.set_value_color(self.info_labels["基准收益率"], f"{benchmark_return:+.2f}%", benchmark_return)
                             else:
                                 # 如果标签不存在，则在这里添加
-                                print("注意: 基准收益率标签不存在，请确保界面布局已包含该标签")
+                                logger.info("注意: 基准收益率标签不存在，请确保界面布局已包含该标签")
                             
                             # 计算基准年化收益率
                             if days > 0:  # 确保有效的交易日数量
@@ -1011,7 +1016,7 @@ class BacktestResultWindow(QMainWindow):
                                     self.set_value_color(self.info_labels["基准年化收益率"], f"{annualized_benchmark_return:+.2f}%", annualized_benchmark_return)
                                 else:
                                     # 如果标签不存在，则在这里添加
-                                    print("注意: 基准年化收益率标签不存在，请确保界面布局已包含该标签")
+                                    logger.info("注意: 基准年化收益率标签不存在，请确保界面布局已包含该标签")
                             
                             # 确保日期对齐
                             daily_stats_df['date'] = pd.to_datetime(daily_stats_df['date'])
@@ -1041,7 +1046,7 @@ class BacktestResultWindow(QMainWindow):
                         self.info_labels["阿尔法"].setText("0.0000")
                         self.info_labels["贝塔"].setText("0.0000")
                 except Exception as e:
-                    print(f"计算阿尔法和贝塔时出错: {str(e)}")
+                    logger.info(f"计算阿尔法和贝塔时出错: {str(e)}")
                     self.info_labels["阿尔法"].setText("0.0000")
                     self.info_labels["贝塔"].setText("0.0000")
                 
@@ -1059,7 +1064,7 @@ class BacktestResultWindow(QMainWindow):
                         trades_df = pd.read_csv(trades_path, encoding='utf-8-sig')
                         
                         # 输出调试信息
-                        print(f"update_basic_info中的交易数据列名: {trades_df.columns.tolist()}")
+                        logger.info(f"update_basic_info中的交易数据列名: {trades_df.columns.tolist()}")
                         
                         # 确保交易记录包含必要的列 - 先检查并尝试修复
                         required_columns = ['time', 'code', 'direction', 'price', 'volume', 'amount']
@@ -1074,11 +1079,11 @@ class BacktestResultWindow(QMainWindow):
                         # 检查是否需要重命名列
                         for old_col, new_col in column_mappings.items():
                             if old_col in trades_df.columns and new_col not in trades_df.columns:
-                                print(f"  将'{old_col}'列重命名为'{new_col}'")
+                                logger.info(f"  将'{old_col}'列重命名为'{new_col}'")
                                 trades_df = trades_df.rename(columns={old_col: new_col})
                         
                         # 输出修正后的列名
-                        print(f"修正后的交易数据列名: {trades_df.columns.tolist()}")
+                        logger.info(f"修正后的交易数据列名: {trades_df.columns.tolist()}")
                         
                         if all(col in trades_df.columns for col in required_columns):
                             # 进行必要的数据转换
@@ -1093,14 +1098,14 @@ class BacktestResultWindow(QMainWindow):
                                     }
                                     # 输出direction列的值以进行调试
                                     unique_directions = trades_df['direction'].unique()
-                                    print(f"交易方向唯一值: {unique_directions}")
+                                    logger.info(f"交易方向唯一值: {unique_directions}")
                                     
                                     # 确保映射函数适用于各种数据类型
                                     trades_df['direction'] = trades_df['direction'].apply(
                                         lambda x: direction_map.get(x, x) if isinstance(x, (int, float)) 
                                                else direction_map.get(str(x).lower(), x))
                                 except Exception as e:
-                                    print(f"买卖动作映射出错: {str(e)}")
+                                    logger.info(f"买卖动作映射出错: {str(e)}")
                             
                             # 计算胜率和盈亏比
                             win_rate, profit_ratio = self.calculate_win_rate_and_profit_ratio(trades_df)
@@ -1117,7 +1122,7 @@ class BacktestResultWindow(QMainWindow):
                         else:
                             # 输出缺少的列
                             missing_columns = [col for col in required_columns if col not in trades_df.columns]
-                            print(f"缺少必要的列: {missing_columns}")
+                            logger.info(f"缺少必要的列: {missing_columns}")
                             # 设置默认值
                             self.info_labels["胜率"].setText("0.00%")
                             self.info_labels["盈亏比"].setText("0.00")
@@ -1136,7 +1141,7 @@ class BacktestResultWindow(QMainWindow):
                         self.info_labels["最大单笔盈利"].setText("0.00")
                         self.info_labels["最大单笔亏损"].setText("0.00")
                 except Exception as e:
-                    print(f"计算交易指标时出错: {str(e)}")
+                    logger.info(f"计算交易指标时出错: {str(e)}")
                     # 设置默认值
                     self.info_labels["胜率"].setText("0.00%")
                     self.info_labels["盈亏比"].setText("0.00")
@@ -1165,9 +1170,9 @@ class BacktestResultWindow(QMainWindow):
                 self.info_labels["年化波动率"].setText("0.00%")
             
         except Exception as e:
-            print(f"更新基本信息时出错: {str(e)}")
+            logger.info(f"更新基本信息时出错: {str(e)}")
             import traceback
-            print(traceback.format_exc())
+            logger.debug(traceback.format_exc())
             # 设置所有标签为默认值
             for label in self.info_labels.values():
                 label.setText("--")
@@ -1201,7 +1206,7 @@ class BacktestResultWindow(QMainWindow):
             
             return drawdown.max()
         except Exception as e:
-            print(f"计算最大回撤时出错: {str(e)}")
+            logger.info(f"计算最大回撤时出错: {str(e)}")
             return 0.0
 
     def calculate_sharpe_ratio(self, returns, risk_free_rate=None):
@@ -1228,11 +1233,11 @@ class BacktestResultWindow(QMainWindow):
                 
             # 检查是否有足够的数据
             if returns is None:
-                print("警告: 收益率数据为None")
+                logger.warning("警告: 收益率数据为None")
                 return 0.0
                 
             if len(returns) < 2:
-                print(f"警告: 收益率数据点不足，当前仅有 {len(returns)} 个点")
+                logger.warning(f"警告: 收益率数据点不足，当前仅有 {len(returns)} 个点")
                 return 0.0
             
             # 确保数据是数值类型
@@ -1240,16 +1245,16 @@ class BacktestResultWindow(QMainWindow):
             
             # 检查数据中是否全为NaN
             if returns.isna().all():
-                print("警告: 收益率数据全部为NaN")
+                logger.warning("警告: 收益率数据全部为NaN")
                 return 0.0
             
             # 移除空值
             valid_returns = returns.dropna()
             if len(valid_returns) < 2:
-                print(f"警告: 移除NaN后，收益率数据点不足，仅有 {len(valid_returns)} 个点")
+                logger.warning(f"警告: 移除NaN后，收益率数据点不足，仅有 {len(valid_returns)} 个点")
                 return 0.0
                 
-            print(f"有效收益率数据点: {len(valid_returns)}/{len(returns)}")
+            logger.info(f"有效收益率数据点: {len(valid_returns)}/{len(returns)}")
             
             # 计算总收益率
             total_return_decimal = (1 + valid_returns).prod() - 1
@@ -1265,7 +1270,7 @@ class BacktestResultWindow(QMainWindow):
             
             # 检查波动率是否为0
             if volatility == 0 or pd.isna(volatility):
-                print("警告: 收益率波动率为0或NaN")
+                logger.warning("警告: 收益率波动率为0或NaN")
                 return 0.0
             
             # 计算夏普比率 Sharpe Ratio = (R_a - R_f) / δ_p
@@ -1273,16 +1278,16 @@ class BacktestResultWindow(QMainWindow):
             
             # 检查结果是否为有效数值
             if np.isnan(sharpe) or np.isinf(sharpe):
-                print(f"警告: 计算出的夏普比率为无效值 {sharpe}")
+                logger.warning(f"警告: 计算出的夏普比率为无效值 {sharpe}")
                 return 0.0
             
-            print(f"计算得出夏普比率: {sharpe:.4f}")
+            logger.info(f"计算得出夏普比率: {sharpe:.4f}")
             return sharpe
         
         except Exception as e:
-            print(f"计算夏普比率时出错: {str(e)}")
+            logger.info(f"计算夏普比率时出错: {str(e)}")
             import traceback
-            print(traceback.format_exc())
+            logger.debug(traceback.format_exc())
             return 0.0
 
     def update_chart(self, daily_stats_df, benchmark_df):
@@ -1373,7 +1378,7 @@ class BacktestResultWindow(QMainWindow):
                     # 计算基准净值序列
                     benchmark_initial = benchmark_df['close'].iloc[0]
                     if benchmark_initial == 0:
-                        print("警告：基准初始值为0，使用1作为替代值")
+                        logger.warning("警告：基准初始值为0，使用1作为替代值")
                         benchmark_initial = 1.0
                     
                     # 尝试获取策略起始日期前一个交易日的基准收盘价
@@ -1385,7 +1390,7 @@ class BacktestResultWindow(QMainWindow):
                         first_date = daily_stats_df['date'].min()
                         
                         # 打印基准数据信息
-                        print(f"基准数据信息: 行数={len(benchmark_df)}, 日期范围={benchmark_df['date'].min()} 到 {benchmark_df['date'].max()}")
+                        logger.info(f"基准数据信息: 行数={len(benchmark_df)}, 日期范围={benchmark_df['date'].min()} 到 {benchmark_df['date'].max()}")
                         
                         # 将日期转换为YYYYMMDD格式
                         first_date_str = first_date.strftime('%Y%m%d')
@@ -1416,20 +1421,20 @@ class BacktestResultWindow(QMainWindow):
                                 prev_close = extra_close.loc['000300.SH', date_columns[-2]]
                                 
                                 # 记录日志
-                                print(f"成功获取到前一交易日沪深300指数收盘价: {prev_close}, 日期: {date_columns[-2]}")
+                                logger.info(f"成功获取到前一交易日沪深300指数收盘价: {prev_close}, 日期: {date_columns[-2]}")
                                 
                                 # 使用前一交易日的收盘价作为基准初始值
                                 benchmark_initial = prev_close
-                                print(f"使用前一交易日收盘价 {benchmark_initial} 作为基准初始值")
+                                logger.info(f"使用前一交易日收盘价 {benchmark_initial} 作为基准初始值")
                             else:
-                                print(f"获取前一交易日数据失败，数据格式可能异常: 索引={extra_close.index}, 列={extra_close.columns}")
-                                print(f"使用首日价格 {benchmark_initial} 作为基准初始值")
+                                logger.exception(f"获取前一交易日数据失败，数据格式可能异常: 索引={extra_close.index}, 列={extra_close.columns}")
+                                logger.info(f"使用首日价格 {benchmark_initial} 作为基准初始值")
                         else:
-                            print(f"获取前一交易日数据失败，extra_data格式: {extra_data}")
-                            print(f"使用首日价格 {benchmark_initial} 作为基准初始值")
+                            logger.error(f"获取前一交易日数据失败，extra_data格式: {extra_data}")
+                            logger.info(f"使用首日价格 {benchmark_initial} 作为基准初始值")
                     except Exception as e:
-                        print(f"尝试获取前一交易日数据时出错: {str(e)}")
-                        print(f"使用首日价格 {benchmark_initial} 作为基准初始值")
+                        logger.info(f"尝试获取前一交易日数据时出错: {str(e)}")
+                        logger.info(f"使用首日价格 {benchmark_initial} 作为基准初始值")
                     
                     # 用基准初始值计算基准净值序列
                     benchmark_values = benchmark_df['close'] / benchmark_initial
@@ -1468,11 +1473,11 @@ class BacktestResultWindow(QMainWindow):
                         self.benchmark_dates = benchmark_data['date'].values
                     else:
                         # 如果没有共同日期但有基准数据，尝试重新对齐日期
-                        print("基准数据与策略数据没有共同的日期，尝试重新对齐")
+                        logger.info("基准数据与策略数据没有共同的日期，尝试重新对齐")
                         
                         # 其他基准处理代码...
                 except Exception as e:
-                    print(f"处理基准数据时出错: {str(e)}")
+                    logger.info(f"处理基准数据时出错: {str(e)}")
             
             # 添加图例
             main_legend_fontsize = int(10 * self.font_scale)  # 适中的主图图例字体
@@ -1585,7 +1590,7 @@ class BacktestResultWindow(QMainWindow):
                     if 'time' in trades_df.columns:
                         trades_df['datetime'] = trades_df['time']
                     elif 'datetime' not in trades_df.columns:
-                        print("警告: 交易记录缺少时间列")
+                        logger.warning("警告: 交易记录缺少时间列")
                         trades_df['datetime'] = pd.NaT
                     
                     if 'action' in trades_df.columns:
@@ -1593,11 +1598,11 @@ class BacktestResultWindow(QMainWindow):
                     elif 'type' in trades_df.columns:
                         trades_df['direction'] = trades_df['type']
                     elif 'direction' not in trades_df.columns:
-                        print("警告: 交易记录缺少交易方向列")
+                        logger.warning("警告: 交易记录缺少交易方向列")
                         trades_df['direction'] = ''
                     
                     if 'volume' not in trades_df.columns:
-                        print("警告: 交易记录缺少成交量列")
+                        logger.warning("警告: 交易记录缺少成交量列")
                         trades_df['volume'] = 0
                     
                     # 转换日期列
@@ -1654,9 +1659,9 @@ class BacktestResultWindow(QMainWindow):
                     self.ax_trades.legend(loc='upper right', facecolor='#333333', edgecolor='#404040', framealpha=0.9, fancybox=True, shadow=True, fontsize=trades_legend_fontsize)
                     
                 except Exception as e:
-                    print(f"处理交易记录时出错: {str(e)}")
+                    logger.info(f"处理交易记录时出错: {str(e)}")
                     import traceback
-                    print(traceback.format_exc())
+                    logger.debug(traceback.format_exc())
             
             # 设置适当的日期定位器和格式化器
             locator = mdates.AutoDateLocator()
@@ -1676,9 +1681,9 @@ class BacktestResultWindow(QMainWindow):
             self.chart_view.draw()
             
         except Exception as e:
-            print(f"更新图表时出错: {str(e)}")
+            logger.info(f"更新图表时出错: {str(e)}")
             import traceback
-            print(traceback.format_exc())
+            logger.debug(traceback.format_exc())
 
     def hover(self, event):
         """处理鼠标悬停事件，显示垂直参考线和数据点"""
@@ -1691,7 +1696,7 @@ class BacktestResultWindow(QMainWindow):
                         try:
                             obj.set_visible(visible)
                         except Exception as e:
-                            print(f"警告: 无法设置对象可见性: {str(e)}")
+                            logger.warning(f"警告: 无法设置对象可见性: {str(e)}")
                 
                 safe_set_visible(self.v_line_ax)
                 safe_set_visible(self.v_line_drawdown)
@@ -1708,7 +1713,7 @@ class BacktestResultWindow(QMainWindow):
                         self.hover_annotation.remove()
                     except (ValueError, AttributeError, TypeError) as e:
                         # 捕获更多可能的异常类型，包括TypeError
-                        print(f"警告: 无法移除悬浮窗，可能已经被移除: {str(e)}")
+                        logger.warning(f"警告: 无法移除悬浮窗，可能已经被移除: {str(e)}")
                         # 对于无法移除的情况，将属性设为None以便后续重新创建
                     finally:
                         # 无论成功与否，都将hover_annotation设为None
@@ -1724,7 +1729,7 @@ class BacktestResultWindow(QMainWindow):
             # 确保 self.dates 和 self.strategy_values 已经被定义
             if not hasattr(self, 'dates') or not hasattr(self, 'strategy_values'):
                 # 这些变量应该在 update_chart 中设置
-                print("警告: 图表数据尚未初始化")
+                logger.warning("警告: 图表数据尚未初始化")
                 return
             
             # 查找最接近的数据点
@@ -1795,12 +1800,12 @@ class BacktestResultWindow(QMainWindow):
                         vline.set_visible(True)
                         return vline
                     except Exception as e:
-                        print(f"警告: 无法更新垂直线: {str(e)}")
+                        logger.warning(f"警告: 无法更新垂直线: {str(e)}")
                 # 创建新的垂直线
                 try:
                     return ax.axvline(x=x_date, color='#ffffff', linestyle='--', alpha=0.5, zorder=10)
                 except Exception as e:
-                    print(f"警告: 无法创建新的垂直线: {str(e)}")
+                    logger.warning(f"警告: 无法创建新的垂直线: {str(e)}")
                     return None
             
             # 安全地更新所有垂直线
@@ -1822,16 +1827,16 @@ class BacktestResultWindow(QMainWindow):
                             except ValueError:
                                 # 捕获"x not in list"错误并记录
                                 import traceback
-                                print(f"警告: 无法移除 {point_attr}，可能已经被移除")
+                                logger.warning(f"警告: 无法移除 {point_attr}，可能已经被移除")
                                 if self.debug_mode:
-                                    print(traceback.format_exc())
+                                    logger.debug(traceback.format_exc())
                             # 无论成功与否，将点设为None
                             setattr(self, point_attr, None)
                         else:
                             # 如果point对象没有remove方法，直接设置为None
                             setattr(self, point_attr, None)
                     except Exception as e:
-                        print(f"警告: 移除 {point_attr} 时发生未知错误: {str(e)}")
+                        logger.error(f"警告: 移除 {point_attr} 时发生未知错误: {str(e)}")
                         setattr(self, point_attr, None)
             
             # 安全地移除各个点
@@ -1895,7 +1900,7 @@ class BacktestResultWindow(QMainWindow):
                     self.hover_annotation.remove()
                 except (ValueError, AttributeError, TypeError) as e:
                     # 捕获更多可能的异常类型，包括TypeError
-                    print(f"警告: 无法移除悬浮窗，可能已经被移除: {str(e)}")
+                    logger.warning(f"警告: 无法移除悬浮窗，可能已经被移除: {str(e)}")
                     # 对于无法移除的情况，将属性设为None以便后续重新创建
                 finally:
                     # 无论成功与否，都将hover_annotation设为None
@@ -1919,9 +1924,9 @@ class BacktestResultWindow(QMainWindow):
             self.chart_view.draw_idle()
             
         except Exception as e:
-            print(f"处理鼠标悬停事件时出错: {str(e)}")
+            logger.info(f"处理鼠标悬停事件时出错: {str(e)}")
             import traceback
-            print(traceback.format_exc())
+            logger.debug(traceback.format_exc())
 
     def update_trades_table(self, trades_df):
         """更新交易记录表格"""
@@ -1996,9 +2001,9 @@ class BacktestResultWindow(QMainWindow):
                 self.trades_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
             
         except Exception as e:
-            print(f"更新交易记录表格时出错: {str(e)}")
+            logger.info(f"更新交易记录表格时出错: {str(e)}")
             import traceback
-            print(traceback.format_exc())
+            logger.debug(traceback.format_exc())
 
     def update_daily_stats_table(self, daily_stats_df):
         """更新每日统计表格"""
@@ -2066,9 +2071,9 @@ class BacktestResultWindow(QMainWindow):
                 self.canvas.draw()
             
         except Exception as e:
-            print(f"更新每日统计表格时出错: {str(e)}")
+            logger.info(f"更新每日统计表格时出错: {str(e)}")
             import traceback
-            print(traceback.format_exc())
+            logger.debug(traceback.format_exc())
 
     def record_results(self, timestamp, data, signals):
         """记录回测结果"""
@@ -2096,9 +2101,9 @@ class BacktestResultWindow(QMainWindow):
             self.update_daily_stats_table(data['daily_stats'])
             
         except Exception as e:
-            print(f"记录回测结果时出错: {str(e)}")
+            logger.info(f"记录回测结果时出错: {str(e)}")
             import traceback
-            print(traceback.format_exc())
+            logger.debug(traceback.format_exc())
 
     def calculate_sortino_ratio(self, returns, risk_free_rate=None, target_return=0.0):
         """计算索提诺比率
@@ -2165,7 +2170,7 @@ class BacktestResultWindow(QMainWindow):
                             first_date = benchmark_df['date'].min()
                             
                             # 打印benchmark_df的基本信息
-                            print(f"基准数据信息: 行数={len(benchmark_df)}, 日期范围={benchmark_df['date'].min()} 到 {benchmark_df['date'].max()}")
+                            logger.info(f"基准数据信息: 行数={len(benchmark_df)}, 日期范围={benchmark_df['date'].min()} 到 {benchmark_df['date'].max()}")
                             
                             # 将日期转换为YYYYMMDD格式
                             first_date_str = first_date.strftime('%Y%m%d')
@@ -2196,19 +2201,19 @@ class BacktestResultWindow(QMainWindow):
                                     prev_close = extra_close.loc['000300.SH', date_columns[-2]]
                                     
                                     # 记录日志
-                                    print(f"成功获取到前一交易日沪深300指数收盘价: {prev_close}, 日期: {date_columns[-2]}")
+                                    logger.info(f"成功获取到前一交易日沪深300指数收盘价: {prev_close}, 日期: {date_columns[-2]}")
                                     
                                     # 将benchmark_df的价格转换为收益率序列
                                     benchmark_prices = benchmark_df['close'].values
-                                    print(f"基准价格数据长度: {len(benchmark_prices)}, 前5个值: {benchmark_prices[:5] if len(benchmark_prices) >= 5 else benchmark_prices}")
+                                    logger.info(f"基准价格数据长度: {len(benchmark_prices)}, 前5个值: {benchmark_prices[:5] if len(benchmark_prices) >= 5 else benchmark_prices}")
                                     
                                     # 计算第一天的收益率
                                     first_day_return = (benchmark_prices[0] - prev_close) / prev_close
-                                    print(f"第一天收益率: {first_day_return:.4%}, 前日价格: {prev_close}, 首日价格: {benchmark_prices[0]}")
+                                    logger.info(f"第一天收益率: {first_day_return:.4%}, 前日价格: {prev_close}, 首日价格: {benchmark_prices[0]}")
                                     
                                     # 检查价格数据长度
                                     if len(benchmark_prices) <= 1:
-                                        print(f"警告: 基准价格数据长度不足 ({len(benchmark_prices)}), 无法计算后续收益率")
+                                        logger.warning(f"警告: 基准价格数据长度不足 ({len(benchmark_prices)}), 无法计算后续收益率")
                                         # 创建适当长度的收益率序列
                                         benchmark_returns = pd.Series([first_day_return] * len(returns))
                                     else:
@@ -2219,17 +2224,17 @@ class BacktestResultWindow(QMainWindow):
                                             rest_returns.append(day_return)
                                         
                                         rest_returns_series = pd.Series(rest_returns)
-                                        print(f"其余日期收益率长度: {len(rest_returns_series)}, 前几个值: {rest_returns_series.head().tolist()}")
+                                        logger.info(f"其余日期收益率长度: {len(rest_returns_series)}, 前几个值: {rest_returns_series.head().tolist()}")
                                         
                                         # 组合所有收益率 - 使用pd.concat代替已弃用的append方法
                                         benchmark_returns = pd.concat([pd.Series([first_day_return]), rest_returns_series]).reset_index(drop=True)
-                                        print(f"合并后收益率长度: {len(benchmark_returns)}, 前几个值: {benchmark_returns.head().tolist()}")
+                                        logger.info(f"合并后收益率长度: {len(benchmark_returns)}, 前几个值: {benchmark_returns.head().tolist()}")
                                     
                                     # 确保基准收益率长度与策略收益率匹配
                                     if len(benchmark_returns) > len(returns):
                                         # 如果基准收益率多于策略收益率，取最后的部分
                                         benchmark_returns = benchmark_returns[-len(returns):]
-                                        print(f"基准收益率过长, 截取后长度: {len(benchmark_returns)}")
+                                        logger.info(f"基准收益率过长, 截取后长度: {len(benchmark_returns)}")
                                     elif len(benchmark_returns) < len(returns):
                                         # 如果基准收益率少于策略收益率，需要填充
                                         padding_needed = len(returns) - len(benchmark_returns)
@@ -2242,19 +2247,19 @@ class BacktestResultWindow(QMainWindow):
                                             padding = pd.Series([0.0003] * padding_needed)  # 默认日收益率0.03%
                                         
                                         benchmark_returns = pd.concat([padding, benchmark_returns]).reset_index(drop=True)
-                                        print(f"基准收益率不足, 填充后长度: {len(benchmark_returns)}, 填充值: {padding.iloc[0]:.4%}")
+                                        logger.info(f"基准收益率不足, 填充后长度: {len(benchmark_returns)}, 填充值: {padding.iloc[0]:.4%}")
                                 else:
                                     # 获取额外数据失败，使用np.diff计算（第一天收益率可能不准确）
-                                    print(f"获取前一交易日数据失败，数据格式可能异常: 索引={extra_close.index}, 列={extra_close.columns}")
+                                    logger.exception(f"获取前一交易日数据失败，数据格式可能异常: 索引={extra_close.index}, 列={extra_close.columns}")
                                     benchmark_prices = benchmark_df['close'].values
                                     benchmark_returns = pd.Series(np.diff(benchmark_prices) / benchmark_prices[:-1])
                             else:
                                 # 获取额外数据失败，使用np.diff计算（第一天收益率可能不准确）
-                                print(f"获取前一交易日数据失败，extra_data格式: {extra_data}")
+                                logger.error(f"获取前一交易日数据失败，extra_data格式: {extra_data}")
                                 benchmark_prices = benchmark_df['close'].values
                                 benchmark_returns = pd.Series(np.diff(benchmark_prices) / benchmark_prices[:-1])
                         except Exception as e:
-                            print(f"尝试获取额外历史数据时出错: {str(e)}")
+                            logger.info(f"尝试获取额外历史数据时出错: {str(e)}")
                             # 使用标准方法计算收益率
                             benchmark_prices = benchmark_df['close'].values
                             benchmark_returns = pd.Series(np.diff(benchmark_prices) / benchmark_prices[:-1])
@@ -2275,23 +2280,23 @@ class BacktestResultWindow(QMainWindow):
                                 padding = pd.Series([0.0003] * padding_needed)  # 默认日收益率0.03%
                             
                             benchmark_returns = pd.concat([padding, benchmark_returns]).reset_index(drop=True)
-                            print(f"基准收益率数据长度不足，已使用{padding.iloc[0]:.4%}填充前{len(padding)}个数据点")
+                            logger.info(f"基准收益率数据长度不足，已使用{padding.iloc[0]:.4%}填充前{len(padding)}个数据点")
                     else:
                         # 使用标准方法计算收益率
                         benchmark_prices = benchmark_df['close'].values
                         benchmark_returns = pd.Series(np.diff(benchmark_prices) / benchmark_prices[:-1])
             except Exception as e:
-                print(f"获取基准收益率时出错: {str(e)}")
+                logger.info(f"获取基准收益率时出错: {str(e)}")
                 import traceback
-                print(traceback.format_exc())
+                logger.debug(traceback.format_exc())
                 # 使用默认的基准收益率
                 benchmark_returns = pd.Series([0.0003] * len(returns))  # 默认日收益率0.03%
-                print("无法获取沪深300指数收益率，使用默认日收益率0.03%作为替代")
+                logger.info("无法获取沪深300指数收益率，使用默认日收益率0.03%作为替代")
             
             # 确保一定有基准收益率数据
             if benchmark_returns is None or len(benchmark_returns) != len(returns):
                 benchmark_returns = pd.Series([0.0003] * len(returns))  # 默认日收益率0.03%
-                print("基准收益率数据处理有误，使用默认日收益率0.03%作为替代")
+                logger.info("基准收益率数据处理有误，使用默认日收益率0.03%作为替代")
             
             # 计算下行波动率 (Downside Risk)
             # 计算下行风险: √[(250/n) * Σ[(Rp(i) - Rm(i))² * f(i)]]
@@ -2324,9 +2329,9 @@ class BacktestResultWindow(QMainWindow):
             return sortino
         
         except Exception as e:
-            print(f"计算索提诺比率时出错: {str(e)}")
+            logger.info(f"计算索提诺比率时出错: {str(e)}")
             import traceback
-            print(traceback.format_exc())
+            logger.debug(traceback.format_exc())
             return 0.0
     
     def calculate_calmar_ratio(self, returns, max_drawdown):
@@ -2376,7 +2381,7 @@ class BacktestResultWindow(QMainWindow):
             return alpha, beta
         
         except Exception as e:
-            print(f"计算阿尔法和贝塔时出错: {str(e)}")
+            logger.info(f"计算阿尔法和贝塔时出错: {str(e)}")
             return 0.0, 0.0
 
     def calculate_win_rate_and_profit_ratio(self, trades_df):
@@ -2445,7 +2450,7 @@ class BacktestResultWindow(QMainWindow):
                             # 更新持仓
                             position -= sell_volume
                     except Exception as e:
-                        print(f"处理交易记录时出错: {str(e)}，交易数据: {trade}")
+                        logger.info(f"处理交易记录时出错: {str(e)}，交易数据: {trade}")
                         continue
             
             # 计算胜率
@@ -2457,9 +2462,9 @@ class BacktestResultWindow(QMainWindow):
             return win_rate, profit_ratio
             
         except Exception as e:
-            print(f"计算胜率和盈亏比时出错: {str(e)}")
+            logger.info(f"计算胜率和盈亏比时出错: {str(e)}")
             import traceback
-            print(traceback.format_exc())
+            logger.debug(traceback.format_exc())
             return 0.0, 0.0
 
     def calculate_trading_metrics(self, trades_df, daily_stats_df):
@@ -2554,7 +2559,7 @@ class BacktestResultWindow(QMainWindow):
                             # 更新持仓
                             position -= sell_volume
                     except Exception as e:
-                        print(f"处理交易记录时出错: {str(e)}，交易数据: {trade}")
+                        logger.info(f"处理交易记录时出错: {str(e)}，交易数据: {trade}")
                         continue
             
             # 返回绝对值的最大亏损（为正数）
@@ -2563,9 +2568,9 @@ class BacktestResultWindow(QMainWindow):
             return daily_trades, max_win_streak, max_loss_streak, max_profit, max_loss_abs
         
         except Exception as e:
-            print(f"计算交易指标时出错: {str(e)}")
+            logger.info(f"计算交易指标时出错: {str(e)}")
             import traceback
-            print(traceback.format_exc())
+            logger.debug(traceback.format_exc())
             return 0.0, 0, 0, 0.0, 0.0
 
     def calculate_volatility(self, returns):
@@ -2606,7 +2611,7 @@ class BacktestResultWindow(QMainWindow):
                     # 如果获取交易日天数失败，则使用实际数据点数量
                     if n <= 0:
                         n = len(returns)
-                        print(f"警告：无法获取交易日天数，使用收益率数据点数量 {n} 作为替代")
+                        logger.warning(f"警告：无法获取交易日天数，使用收益率数据点数量 {n} 作为替代")
                 else:
                     # 如果没有日期数据，使用数据点数量
                     n = len(returns)
@@ -2627,7 +2632,7 @@ class BacktestResultWindow(QMainWindow):
             return volatility
         
         except Exception as e:
-            print(f"计算年化波动率时出错: {str(e)}")
+            logger.info(f"计算年化波动率时出错: {str(e)}")
             return 0.0
 
     def update_performance_charts(self, daily_stats_df, benchmark_df=None):
@@ -2640,9 +2645,9 @@ class BacktestResultWindow(QMainWindow):
             self.update_monthly_returns_heatmap(daily_stats_df)
             
         except Exception as e:
-            print(f"更新绩效评估图表时出错: {str(e)}")
+            logger.info(f"更新绩效评估图表时出错: {str(e)}")
             import traceback
-            print(traceback.format_exc())
+            logger.debug(traceback.format_exc())
     
     def update_returns_distribution_chart(self, returns):
         """更新收益分布图"""
@@ -2717,9 +2722,9 @@ class BacktestResultWindow(QMainWindow):
             self.returns_dist_canvas.draw()
             
         except Exception as e:
-            print(f"更新收益分布图时出错: {str(e)}")
+            logger.info(f"更新收益分布图时出错: {str(e)}")
             import traceback
-            print(traceback.format_exc())
+            logger.debug(traceback.format_exc())
     
     def update_monthly_returns_heatmap(self, daily_stats_df):
         """更新月度收益热力图"""
@@ -2808,9 +2813,9 @@ class BacktestResultWindow(QMainWindow):
             self.monthly_returns_canvas.draw()
             
         except Exception as e:
-            print(f"更新月度收益热力图时出错: {str(e)}")
+            logger.info(f"更新月度收益热力图时出错: {str(e)}")
             import traceback
-            print(traceback.format_exc())
+            logger.debug(traceback.format_exc())
     
     def update_rolling_metrics_chart(self, daily_stats_df, benchmark_df=None):
         """更新滚动指标图"""
@@ -2993,9 +2998,9 @@ class BacktestResultWindow(QMainWindow):
             self.rolling_metrics_canvas.draw()
             
         except Exception as e:
-            print(f"更新滚动指标图时出错: {str(e)}")
+            logger.info(f"更新滚动指标图时出错: {str(e)}")
             import traceback
-            print(traceback.format_exc())
+            logger.debug(traceback.format_exc())
 
     def calculate_benchmark_return(self, benchmark_df):
         """计算基准收益率
@@ -3030,7 +3035,7 @@ class BacktestResultWindow(QMainWindow):
                     first_date = pd.to_datetime(benchmark_df['date'].iloc[0])
                     
                     # 打印benchmark_df的基本信息
-                    print(f"基准数据信息: 行数={len(benchmark_df)}, 日期范围={benchmark_df['date'].min()} 到 {benchmark_df['date'].max()}")
+                    logger.info(f"基准数据信息: 行数={len(benchmark_df)}, 日期范围={benchmark_df['date'].min()} 到 {benchmark_df['date'].max()}")
                     
                     # 将日期转换为YYYYMMDD格式
                     first_date_str = first_date.strftime('%Y%m%d')
@@ -3061,19 +3066,19 @@ class BacktestResultWindow(QMainWindow):
                             start_price = extra_close.loc['000300.SH', date_columns[-2]]
                             
                             # 记录日志
-                            print(f"成功获取到前一交易日沪深300指数收盘价: {start_price}, 日期: {date_columns[-2]}")
+                            logger.info(f"成功获取到前一交易日沪深300指数收盘价: {start_price}, 日期: {date_columns[-2]}")
                         else:
                             # 获取额外数据失败，使用首日价格
                             start_price = benchmark_df['close'].iloc[0]
-                            print(f"获取前一交易日数据失败，数据格式可能异常: 索引={extra_close.index if isinstance(extra_close, pd.DataFrame) else '非DataFrame'}, 使用首日价格: {start_price}")
+                            logger.exception(f"获取前一交易日数据失败，数据格式可能异常: 索引={extra_close.index if isinstance(extra_close, pd.DataFrame) else '非DataFrame'}, 使用首日价格: {start_price}")
                     else:
                         # 获取额外数据失败，使用首日价格
                         start_price = benchmark_df['close'].iloc[0]
-                        print(f"获取前一交易日数据失败，extra_data格式: {extra_data}, 使用首日价格: {start_price}")
+                        logger.error(f"获取前一交易日数据失败，extra_data格式: {extra_data}, 使用首日价格: {start_price}")
                 except Exception as e:
                     # 发生异常时，使用首日价格
                     start_price = benchmark_df['close'].iloc[0]
-                    print(f"尝试获取前一交易日数据时出错: {str(e)}, 使用首日价格: {start_price}")
+                    logger.info(f"尝试获取前一交易日数据时出错: {str(e)}, 使用首日价格: {start_price}")
                 
                 # 计算收益率
                 if start_price > 0:
@@ -3083,9 +3088,9 @@ class BacktestResultWindow(QMainWindow):
             return 0.0
             
         except Exception as e:
-            print(f"计算基准收益率时出错: {str(e)}")
+            logger.info(f"计算基准收益率时出错: {str(e)}")
             import traceback
-            print(traceback.format_exc())
+            logger.debug(traceback.format_exc())
             return 0.0
 
     def calculate_annualized_benchmark_return(self, benchmark_return, days_count):
@@ -3102,7 +3107,7 @@ class BacktestResultWindow(QMainWindow):
         try:
             # 检查参数有效性
             if days_count <= 0:
-                print("警告：交易日数量无效，无法计算基准年化收益率")
+                logger.warning("警告：交易日数量无效，无法计算基准年化收益率")
                 return 0.0
                 
             # 将百分比形式的基准收益率转换为小数形式
@@ -3111,14 +3116,14 @@ class BacktestResultWindow(QMainWindow):
             # 计算基准年化收益率
             annualized_benchmark_return = (pow(1 + benchmark_return_decimal, 250/days_count) - 1) * 100
             
-            print(f"基准收益率：{benchmark_return:.2f}%，交易日数量：{days_count}，基准年化收益率：{annualized_benchmark_return:.2f}%")
+            logger.info(f"基准收益率：{benchmark_return:.2f}%，交易日数量：{days_count}，基准年化收益率：{annualized_benchmark_return:.2f}%")
             
             return annualized_benchmark_return
             
         except Exception as e:
-            print(f"计算基准年化收益率时出错: {str(e)}")
+            logger.info(f"计算基准年化收益率时出错: {str(e)}")
             import traceback
-            print(traceback.format_exc())
+            logger.debug(traceback.format_exc())
             return 0.0
 
     def calculate_alpha(self, strategy_annual_return, benchmark_annual_return, beta, risk_free_rate=None):
@@ -3148,7 +3153,7 @@ class BacktestResultWindow(QMainWindow):
             alpha = strategy_annual_return - (risk_free_rate + beta * (benchmark_annual_return - risk_free_rate))
             alpha = alpha/100
             # 输出调试信息
-            print(f"Alpha计算: {strategy_annual_return} - ({risk_free_rate} + {beta} * ({benchmark_annual_return} - {risk_free_rate})) = {alpha}")
+            logger.info(f"Alpha计算: {strategy_annual_return} - ({risk_free_rate} + {beta} * ({benchmark_annual_return} - {risk_free_rate})) = {alpha}")
             
             # 检查结果是否为有效数值
             if np.isnan(alpha) or np.isinf(alpha):
@@ -3157,9 +3162,9 @@ class BacktestResultWindow(QMainWindow):
             return alpha
             
         except Exception as e:
-            print(f"计算Alpha时出错: {str(e)}")
+            logger.info(f"计算Alpha时出错: {str(e)}")
             import traceback
-            print(traceback.format_exc())
+            logger.debug(traceback.format_exc())
             return 0.0
 
 if __name__ == "__main__":
@@ -3173,8 +3178,8 @@ if __name__ == "__main__":
     
     # 检查路径是否存在，如果不存在则创建相应提示
     if not os.path.exists(default_path):
-        print(f"警告: 默认路径不存在: {default_path}")
-        print("将尝试继续使用该路径...")
+        logger.warning(f"警告: 默认路径不存在: {default_path}")
+        logger.info("将尝试继续使用该路径...")
     
     # 创建并显示回测结果窗口
     window = BacktestResultWindow(default_path)

@@ -1,0 +1,17 @@
+============================= test session starts =============================
+platform win32 -- Python 3.11.14, pytest-9.0.2, pluggy-1.6.0 -- D:\scoop\apps\miniconda\current\envs\khquant-test\python.exe
+cachedir: .pytest_cache
+benchmark: 5.2.3 (defaults: timer=time.perf_counter disable_gc=False min_rounds=5 min_time=0.000005 max_time=1.0 calibration_precision=10 warmup=False warmup_iterations=100000)
+PyQt5 5.15.11 -- Qt runtime 5.15.2 -- Qt compiled 5.15.2
+rootdir: G:\berton\oskhquant
+configfile: pytest.ini
+plugins: benchmark-5.2.3, cov-7.0.0, mock-3.15.1, qt-4.5.0, timeout-2.4.0, xdist-3.8.0
+collecting ... collected 706 items
+
+tests/gui/test_GUI.py::TestGUIModule::test_module_import FAILED          [  0%]
+tests/gui/test_GUI.py::TestGUIModule::test_setup_logging_function FAILED [  0%]
+tests/gui/test_GUI.py::TestStockDataProcessorGUI::test_class_exists FAILED [  0%]
+tests/gui/test_GUI.py::TestStockDataProcessorGUI::test_data_download_mock PASSED [  0%]
+tests/gui/test_GUI.py::TestStockDataProcessorGUI::test_progress_bar_mock PASSED [  0%]
+tests/gui/test_GUI.py::TestStockDataProcessorGUI::test_stock_list_management_mock PASSED [  0%]
+tests/gui/test_GUI.py::TestGUIComponents::test_button_creation 

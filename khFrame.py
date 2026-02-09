@@ -1,4 +1,5 @@
 # coding: utf-8
+from logging_config import get_module_logger
 import time
 import datetime
 import traceback
@@ -9,6 +10,10 @@ import sys
 import shutil
 from types import SimpleNamespace
 import threading
+
+# 日志系统
+logger = get_module_logger(__name__)
+
 
 from xtquant import xtdata
 from xtquant.xttrader import XtQuantTrader, XtQuantTraderCallback
@@ -42,11 +47,11 @@ class SimpleGUI:
 
     def log_message(self, message, level="INFO"):
         """记录日志消息"""
-        print(f"[{level}] {datetime.datetime.now()} - {message}")
+        logger.info(f"[{level}] {datetime.datetime.now()} - {message}")
 
     def on_strategy_finished(self):
         """策略完成回调"""
-        print(f"[INFO] {datetime.datetime.now()} - 策略执行完成")
+        logger.info(f"[INFO] {datetime.datetime.now()} - 策略执行完成")
 
 # 触发器基类
 class TriggerBase:
@@ -334,7 +339,7 @@ class MyTraderCallback(XtQuantTraderCallback):
             )
             
             self.gui.log_message(order_msg, "TRADE")
-            print(datetime.datetime.now(), '委托回调', order.order_remark)
+            logger.info(datetime.datetime.now(), '委托回调', order.order_remark)
             
         except Exception as e:
             self.gui.log_message(f"处理委托回报时出错: {str(e)}", "ERROR")
@@ -383,7 +388,7 @@ class MyTraderCallback(XtQuantTraderCallback):
             )
             
             self.gui.log_message(trade_msg, "TRADE")
-            print(datetime.datetime.now(), '成交回调', trade.order_remark)
+            logger.info(datetime.datetime.now(), '成交回调', trade.order_remark)
             
         except Exception as e:
             self.gui.log_message(f"处理成交回报时出错: {str(e)}", "ERROR")
@@ -400,7 +405,7 @@ class MyTraderCallback(XtQuantTraderCallback):
             )
             
             self.gui.log_message(error_msg, "ERROR")
-            print(f"委托报错回调 {order_error.order_remark} {order_error.error_msg}")
+            logger.error(f"委托报错回调 {order_error.order_remark} {order_error.error_msg}")
             
         except Exception as e:
             self.gui.log_message(f"处理委托错误时出错: {str(e)}", "ERROR")
@@ -416,7 +421,7 @@ class MyTraderCallback(XtQuantTraderCallback):
             )
             
             self.gui.log_message(error_msg, "ERROR")
-            print(datetime.datetime.now(), sys._getframe().f_code.co_name)
+            logger.info(datetime.datetime.now(), sys._getframe().f_code.co_name)
             
         except Exception as e:
             self.gui.log_message(f"处理撤单错误时出错: {str(e)}", "ERROR")
@@ -424,14 +429,14 @@ class MyTraderCallback(XtQuantTraderCallback):
     def on_disconnected(self):
         """连接断开"""
         self.gui.log_message("交易连接已断开", "WARNING")
-        print(datetime.datetime.now(),'连接断开回调')
+        logger.info(datetime.datetime.now(),'连接断开回调')
 
     def on_order_stock_async_response(self, response):
         """异步下单回报推送"""
         try:
             msg = f"异步委托回调 - 备注: {response.order_remark}"
             self.gui.log_message(msg, "TRADE")
-            print(f"异步委托回调 {response.order_remark}")
+            logger.info(f"异步委托回调 {response.order_remark}")
         except Exception as e:
             self.gui.log_message(f"处理异步下单回报时出错: {str(e)}", "ERROR")
 
@@ -440,7 +445,7 @@ class MyTraderCallback(XtQuantTraderCallback):
         try:
             msg = f"撤单异步回报 - 委托编号: {response.order_id}"
             self.gui.log_message(msg, "TRADE")
-            print(datetime.datetime.now(), sys._getframe().f_code.co_name)
+            logger.info(datetime.datetime.now(), sys._getframe().f_code.co_name)
         except Exception as e:
             self.gui.log_message(f"处理撤单异步回报时出错: {str(e)}", "ERROR")
 
@@ -449,7 +454,7 @@ class MyTraderCallback(XtQuantTraderCallback):
         try:
             msg = f"账户状态变动 - 账户: {status.account_id} | 状态: {status.status}"
             self.gui.log_message(msg, "INFO")
-            print(datetime.datetime.now(), sys._getframe().f_code.co_name)
+            logger.info(datetime.datetime.now(), sys._getframe().f_code.co_name)
         except Exception as e:
             self.gui.log_message(f"处理账户状态变动时出错: {str(e)}", "ERROR")
 
@@ -486,8 +491,8 @@ class MyTraderCallback(XtQuantTraderCallback):
                 f"总资产: {asset.total_asset:.{decimals}f}"
             )
             self.gui.log_message(msg, "INFO")
-            print("资金变动推送on asset callback")
-            print(asset.account_id, asset.cash, asset.total_asset)
+            logger.info("资金变动推送on asset callback")
+            logger.info(asset.account_id, asset.cash, asset.total_asset)
         except Exception as e:
             self.gui.log_message(f"处理资金变动时出错: {str(e)}", "ERROR")
             '''
@@ -503,9 +508,9 @@ class KhQuantFramework:
             strategy_file: 策略文件路径
             trader_callback: 交易回调函数
         """
-        print(f"[DEBUG] KhQuantFramework.__init__ 开始")
-        print(f"[DEBUG] config_path: {config_path}")
-        print(f"[DEBUG] strategy_file: {strategy_file}")
+        logger.debug(f"[DEBUG] KhQuantFramework.__init__ 开始")
+        logger.debug(f"[DEBUG] config_path: {config_path}")
+        logger.debug(f"[DEBUG] strategy_file: {strategy_file}")
         
         self.config_path = config_path
         self.config = KhConfig(config_path)
@@ -533,12 +538,12 @@ class KhQuantFramework:
         self.gui = SimpleGUI()
         
         # 加载策略模块
-        print(f"[DEBUG] 准备加载策略模块: {strategy_file}")
+        logger.debug(f"[DEBUG] 准备加载策略模块: {strategy_file}")
         try:
             self.strategy_module = self.load_strategy(strategy_file)
-            print(f"[DEBUG] 策略模块加载成功")
+            logger.debug(f"[DEBUG] 策略模块加载成功")
         except Exception as e:
-            print(f"[DEBUG] 策略模块加载失败: {str(e)}")
+            logger.error(f"[DEBUG] 策略模块加载失败: {str(e)}")
             import traceback
             traceback.print_exc()
             raise
@@ -617,7 +622,7 @@ class KhQuantFramework:
             self.trader_callback.gui.log_message(message, level)
         else:
             # 在调试模式下，trader_callback可能不存在，使用print输出
-            print(f"[{level}] {datetime.datetime.now()} - {message}")
+            logger.info(f"[{level}] {datetime.datetime.now()} - {message}")
 
     def _should_log(self):
         """检查是否应该输出日志（用于性能优化）
@@ -642,7 +647,7 @@ class KhQuantFramework:
         Raises:
             SecurityError: 策略文件安全验证失败时抛出
         """
-        print(f"[DEBUG] load_strategy 被调用，参数: {strategy_file}")
+        logger.debug(f"[DEBUG] load_strategy 被调用，参数: {strategy_file}")
 
         # 导入安全模块
         from khSecurity import SafePathResolver, StrategySecurityValidator, SecurityError
@@ -668,50 +673,50 @@ class KhQuantFramework:
                 error_msg = f"策略安全验证失败:\n" + "\n".join(f"  - {msg}" for msg in messages)
                 raise SecurityError(error_msg)
 
-            print(f"[DEBUG] 策略安全验证通过: {safe_path}")
+            logger.debug(f"[DEBUG] 策略安全验证通过: {safe_path}")
 
             # 4. 获取策略文件的绝对路径
             strategy_file = str(safe_path)
-            print(f"[DEBUG] 策略文件绝对路径: {strategy_file}")
+            logger.debug(f"[DEBUG] 策略文件绝对路径: {strategy_file}")
 
             # 5. 使用策略文件的实际文件名作为模块名（不含.py扩展名）
             # 这样debugpy可以正确识别模块
             module_name = os.path.splitext(os.path.basename(strategy_file))[0]
-            print(f"[DEBUG] 模块名: {module_name}")
+            logger.debug(f"[DEBUG] 模块名: {module_name}")
 
             # 6. 创建模块规范
             spec = importlib.util.spec_from_file_location(module_name, strategy_file)
-            print(f"[DEBUG] spec 创建成功")
+            logger.debug(f"[DEBUG] spec 创建成功")
 
             # 7. 创建模块对象
             strategy_module = importlib.util.module_from_spec(spec)
-            print(f"[DEBUG] 模块对象创建成功")
+            logger.debug(f"[DEBUG] 模块对象创建成功")
 
             # 8. 将模块添加到sys.modules，这样debugpy可以找到它
             sys.modules[module_name] = strategy_module
-            print(f"[DEBUG] 模块已添加到sys.modules: {module_name}")
+            logger.debug(f"[DEBUG] 模块已添加到sys.modules: {module_name}")
 
             # 9. 确保模块的__file__属性指向正确的源文件
             strategy_module.__file__ = strategy_file
-            print(f"[DEBUG] 模块__file__属性: {strategy_module.__file__}")
+            logger.debug(f"[DEBUG] 模块__file__属性: {strategy_module.__file__}")
 
             # 10. 执行模块代码
-            print(f"[DEBUG] 准备执行模块代码")
+            logger.debug(f"[DEBUG] 准备执行模块代码")
             spec.loader.exec_module(strategy_module)
-            print(f"[DEBUG] 模块代码执行完成")
+            logger.debug(f"[DEBUG] 模块代码执行完成")
 
             return strategy_module
 
         except SecurityError as e:
             error_msg = f"加载策略失败 - {e.message}"
-            print(f"[ERROR] {error_msg}")
+            logger.error(f"[ERROR] {error_msg}")
             if self.trader_callback:
                 self.trader_callback.gui.log_message(error_msg, "ERROR")
             raise
 
         except Exception as e:
             error_msg = f"加载策略异常: {str(e)}"
-            print(f"[ERROR] {error_msg}", exc_info=True)
+            logger.error(f"[ERROR] {error_msg}", exc_info=True)
             if self.trader_callback:
                 self.trader_callback.gui.log_message(error_msg, "ERROR")
             raise
@@ -765,9 +770,9 @@ class KhQuantFramework:
         # 初始化成交字典
         self.trade_mgr.trades = {}  # 初始成交为空
         
-        print(f"虚拟账户初始化完成: {self.config.account_id}")
-        print(f"初始资产: {self.trade_mgr.assets}")
-        print(f"基准合约: {self.benchmark}")
+        logger.info(f"虚拟账户初始化完成: {self.config.account_id}")
+        logger.info(f"初始资产: {self.trade_mgr.assets}")
+        logger.info(f"基准合约: {self.benchmark}")
         
     def create_callback(self) -> XtQuantTraderCallback:
         """创建交易回调对象"""
@@ -780,7 +785,7 @@ class KhQuantFramework:
         
         def download_progress(progress):
             nonlocal download_complete
-            print(f"下载进度: {progress}")
+            logger.info(f"下载进度: {progress}")
             if progress['finished'] >= progress['total']:
                 download_complete = True
         
@@ -1358,14 +1363,14 @@ class KhQuantFramework:
                             self.trader_callback.gui.log_message(f"警告：继续运行不匹配配置 - 数据周期:{data_name}, 触发类型:{trigger_name}", "WARNING")
                 else:
                     # 没有GUI回调的情况，直接在日志中记录警告
-                    print(f"警告：数据周期({data_period})与触发类型({trigger_type})不匹配")
+                    logger.warning(f"警告：数据周期({data_period})与触发类型({trigger_type})不匹配")
                     
         except Exception as e:
             # 检查过程中出现异常，记录但不影响回测继续运行
             if self.trader_callback:
                 self.trader_callback.gui.log_message(f"周期一致性检查时出错: {str(e)}", "WARNING")
             else:
-                print(f"周期一致性检查时出错: {str(e)}")
+                logger.info(f"周期一致性检查时出错: {str(e)}")
 
     def _run_realtime_trade(self, stock_codes: List[str]):
         """实时交易模式
@@ -3251,7 +3256,7 @@ class KhQuantFramework:
             
     def log_error(self, msg: str):
         """错误日志"""
-        print(f"[ERROR] {datetime.datetime.now()} - {msg}")
+        logger.error(f"[ERROR] {datetime.datetime.now()} - {msg}")
 
     def _format_runtime(self, seconds):
         """格式化运行时间"""
@@ -3274,9 +3279,9 @@ class KhQuantFramework:
                     f"市值: {position.market_value:.{decimals}f}"
                 )
                 self.trader_callback.gui.log_message(position_msg, "TRADE")
-            print(f"持仓变动回调: {position.stock_code}")
+            logger.info(f"持仓变动回调: {position.stock_code}")
         except Exception as e:
-            print(f"处理持仓变动回调时出错: {str(e)}")
+            logger.info(f"处理持仓变动回调时出错: {str(e)}")
     
     def on_order_error(self, error):
         """委托错误回调"""
@@ -3290,9 +3295,9 @@ class KhQuantFramework:
                     f"备注: {error.order_remark}"
                 )
                 self.trader_callback.gui.log_message(error_msg, "ERROR")
-            print(f"[ERROR] 委托错误: {error.error_msg}")
+            logger.error(f"[ERROR] 委托错误: {error.error_msg}")
         except Exception as e:
-            print(f"处理委托错误回调时出错: {str(e)}")
+            logger.error(f"处理委托错误回调时出错: {str(e)}")
     
     def on_stock_order(self, order):
         """委托回报回调"""
@@ -3307,9 +3312,9 @@ class KhQuantFramework:
                     f"委托数量: {getattr(order, 'order_volume', 'N/A')}"
                 )
                 self.trader_callback.gui.log_message(order_msg, "TRADE")
-            print(f"委托回报: {order.stock_code}")
+            logger.info(f"委托回报: {order.stock_code}")
         except Exception as e:
-            print(f"处理委托回报时出错: {str(e)}")
+            logger.info(f"处理委托回报时出错: {str(e)}")
     
     def on_stock_trade(self, trade):
         """成交回报回调"""
@@ -3323,9 +3328,9 @@ class KhQuantFramework:
                     f"成交金额: {getattr(trade, 'traded_amount', 'N/A')}"
                 )
                 self.trader_callback.gui.log_message(trade_msg, "TRADE")
-            print(f"成交回报: {trade.stock_code}")
+            logger.info(f"成交回报: {trade.stock_code}")
         except Exception as e:
-            print(f"处理成交回报时出错: {str(e)}")
+            logger.info(f"处理成交回报时出错: {str(e)}")
     
     def on_stock_asset(self, asset):
         """资产变动回调"""
@@ -3338,6 +3343,6 @@ class KhQuantFramework:
                     f"市值: {getattr(asset, 'market_value', 'N/A')}"
                 )
                 self.trader_callback.gui.log_message(asset_msg, "INFO")
-            print(f"资产变动: 总资产={getattr(asset, 'total_asset', 'N/A')}")
+            logger.info(f"资产变动: 总资产={getattr(asset, 'total_asset', 'N/A')}")
         except Exception as e:
-            print(f"处理资产变动时出错: {str(e)}")
+            logger.info(f"处理资产变动时出错: {str(e)}")

@@ -1,4 +1,8 @@
 # 该文件为GUI.py
+from logging_config import get_module_logger
+# 日志系统
+logger = get_module_logger(__name__)
+
 import sys
 import os
 import ctypes
@@ -53,7 +57,7 @@ class NoWheelDateEdit(QDateEdit):
                     self.setFont(font)
                     break
         except Exception as e:
-            print(f"设置DateEdit字体时出错: {str(e)}")
+            logger.info(f"设置DateEdit字体时出错: {str(e)}")
     
     def wheelEvent(self, event):
         # 忽略滚轮事件，不调用父类的wheelEvent
@@ -78,7 +82,7 @@ class NoWheelTimeEdit(QTimeEdit):
                     self.setFont(font)
                     break
         except Exception as e:
-            print(f"设置TimeEdit字体时出错: {str(e)}")
+            logger.info(f"设置TimeEdit字体时出错: {str(e)}")
     
     def wheelEvent(self, event):
         # 忽略滚轮事件，不调用父类的wheelEvent
@@ -338,7 +342,7 @@ class DownloadThread(QThread):
         self.mutex.unlock()
         return result
 
-def closeEvent(self, event):
+    def closeEvent(self, event):
         """窗口关闭时的处理"""
         try:
             # 停止所有定时器
@@ -346,7 +350,7 @@ def closeEvent(self, event):
                 self.status_timer.stop()
             if hasattr(self, 'refresh_timer'):
                 self.refresh_timer.stop()
-            
+
             # 停止下载线程
             if hasattr(self, 'download_thread') and self.download_thread:
                 logging.info("正在停止下载线程...")
@@ -388,188 +392,188 @@ def closeEvent(self, event):
 
             logging.info("程序正常退出")
             event.accept()
-            
+
         except Exception as e:
             logging.error(f"程序退出时出错: {str(e)}", exc_info=True)
             event.accept()  # 确保程序能够退出
 
-def supplement_data_worker(params, progress_queue, result_queue, stop_event):
-    """
-    数据补充工作进程函数
-    在独立进程中运行，避免GIL限制
-    """
-    # 多进程保护 - 防止在子进程中启动GUI
-    if __name__ != '__main__':
-        # 在子进程中，确保不会执行主程序代码
-        import multiprocessing
-        multiprocessing.current_process().name = 'GUISupplementWorker'
-    
-    try:
-        # 在子进程中导入需要的模块
-        import sys
-        import os
-        
-        # 延迟导入并捕获任何GUI相关错误
+    def supplement_data_worker(params, progress_queue, result_queue, stop_event):
+        """
+        数据补充工作进程函数
+        在独立进程中运行，避免GIL限制
+        """
+        # 多进程保护 - 防止在子进程中启动GUI
+        if __name__ != '__main__':
+            # 在子进程中，确保不会执行主程序代码
+            import multiprocessing
+            multiprocessing.current_process().name = 'GUISupplementWorker'
+
         try:
-            from khQTTools import supplement_history_data
-        except Exception as import_error:
-            # 如果导入失败，尝试直接从当前目录导入
-            current_dir = os.path.dirname(os.path.abspath(__file__))
-            sys.path.insert(0, current_dir)
+            # 在子进程中导入需要的模块
+            import sys
+            import os
+
+            # 延迟导入并捕获任何GUI相关错误
             try:
                 from khQTTools import supplement_history_data
-            except:
-                result_queue.put(('error', f"无法导入数据补充模块: {str(import_error)}"))
-                return
-        
-        import logging
-        import time
-        import re
-        
-        # 配置子进程的日志
-        logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-        
-        # 进度和状态更新的时间控制
-        last_progress_time = 0
-        last_status_time = 0
-        last_reported_percent = -1.0  # 上次报告的进度百分比
-        update_interval = 0.5  # 500毫秒
-        percent_threshold = 1.0  # 每次至少更新1%
+            except Exception as import_error:
+                # 如果导入失败，尝试直接从当前目录导入
+                current_dir = os.path.dirname(os.path.abspath(__file__))
+                sys.path.insert(0, current_dir)
+                try:
+                    from khQTTools import supplement_history_data
+                except:
+                    result_queue.put(('error', f"无法导入数据补充模块: {str(import_error)}"))
+                    return
 
-        # 统计信息
-        supplement_stats = {
-            'total_stocks': 0,
-            'success_count': 0,
-            'empty_data_count': 0,
-            'error_count': 0,
-            'empty_stocks': []
-        }
+            import logging
+            import time
+            import re
 
-        def progress_callback(percent):
-            nonlocal last_progress_time, last_reported_percent
-            current_time = time.time()
+            # 配置子进程的日志
+            logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-            # 基于百分比的节流：每1%更新一次，或完成时(100%)，或首次更新(0%)
-            percent_diff = abs(percent - last_reported_percent)
-            should_update_by_percent = (
-                last_reported_percent < 0 or  # 首次更新
-                percent_diff >= percent_threshold or  # 达到1%变化
-                percent >= 100.0  # 完成时必须更新
+            # 进度和状态更新的时间控制
+            last_progress_time = 0
+            last_status_time = 0
+            last_reported_percent = -1.0  # 上次报告的进度百分比
+            update_interval = 0.5  # 500毫秒
+            percent_threshold = 1.0  # 每次至少更新1%
+
+            # 统计信息
+            supplement_stats = {
+                'total_stocks': 0,
+                'success_count': 0,
+                'empty_data_count': 0,
+                'error_count': 0,
+                'empty_stocks': []
+            }
+
+            def progress_callback(percent):
+                nonlocal last_progress_time, last_reported_percent
+                current_time = time.time()
+
+                # 基于百分比的节流：每1%更新一次，或完成时(100%)，或首次更新(0%)
+                percent_diff = abs(percent - last_reported_percent)
+                should_update_by_percent = (
+                    last_reported_percent < 0 or  # 首次更新
+                    percent_diff >= percent_threshold or  # 达到1%变化
+                    percent >= 100.0  # 完成时必须更新
+                )
+
+                # 基于时间的节流：至少间隔500毫秒
+                should_update_by_time = current_time - last_progress_time >= update_interval
+
+                # 满足任一条件即更新（优先使用百分比节流）
+                if should_update_by_percent or should_update_by_time:
+                    try:
+                        progress_queue.put(('progress', percent), timeout=1)
+                        last_progress_time = current_time
+                        last_reported_percent = percent
+                        logger.debug(f"[GUI进程] 发送进度: {percent}%")
+                    except Exception as e:
+                        logger.error(f"[GUI进程] 发送进度失败: {e}")
+
+            def log_callback(message):
+                nonlocal last_status_time
+                current_time = time.time()
+
+                try:
+                    # 处理消息的统计和格式化（修复过滤逻辑）
+                    # 检查是否是补充数据的成功消息
+                    success_pattern = r"^补充\s+(.*?\.\S+)\s+数据成功"
+                    success_match = re.match(success_pattern, message)
+
+                    if success_match:
+                        # 这是成功的补充消息，应该显示出来
+                        stock_code = success_match.group(1)
+                        supplement_stats['success_count'] += 1
+
+                        # 直接转发成功消息，不修改格式
+                        progress_queue.put(('status', message), timeout=1)
+                        logger.debug(f"[GUI进程] 发送成功状态: {message}")
+                        return
+
+                    # 检查是否是错误消息
+                    error_pattern = r"^补充\s+(.*?\.\S+)\s+数据时出错"
+                    error_match = re.match(error_pattern, message)
+
+                    if error_match:
+                        # 这是错误消息，应该显示出来
+                        stock_code = error_match.group(1)
+                        supplement_stats['error_count'] += 1
+
+                        # 直接转发错误消息
+                        progress_queue.put(('status', message), timeout=1)
+                        logger.error(f"[GUI进程] 发送错误状态: {message}")
+                        return
+
+                    # 检查是否是空数据消息
+                    empty_pattern = r"^补充\s+(.*?\.\S+)\s+数据成功，但数据为空"
+                    empty_match = re.match(empty_pattern, message)
+
+                    if empty_match:
+                        # 这是空数据消息，应该显示出来
+                        stock_code = empty_match.group(1)
+                        supplement_stats['empty_data_count'] += 1
+                        if stock_code not in supplement_stats['empty_stocks']:
+                            supplement_stats['empty_stocks'].append(stock_code)
+
+                        # 直接转发空数据消息
+                        progress_queue.put(('status', message), timeout=1)
+                        logger.debug(f"[GUI进程] 发送空数据状态: {message}")
+                        return
+
+                    # 重要消息立即发送
+                    is_important = any(keyword in str(message) for keyword in ['开始', '完成', '失败', '错误', '中断'])
+
+                    if is_important or current_time - last_status_time >= update_interval:
+                        try:
+                            progress_queue.put(('status', str(message)), timeout=1)
+                            last_status_time = current_time
+                            logger.debug(f"[GUI进程] 发送状态: {message}")
+                        except Exception as e:
+                            logger.error(f"[GUI进程] 发送状态失败: {e}")
+
+                except Exception as e:
+                    logger.error(f"[GUI进程] log_callback 处理错误: {e}")
+
+            def check_interrupt():
+                # 检查停止事件
+                return stop_event.is_set()
+
+            # 执行数据补充
+            supplement_history_data(
+                stock_files=params['stock_files'],
+                field_list=params['field_list'],
+                period_type=params['period_type'],
+                start_date=params['start_date'],
+                end_date=params['end_date'],
+                time_range=params.get('time_range', 'all'),
+                dividend_type=params.get('dividend_type', 'none'),
+                progress_callback=progress_callback,
+                log_callback=log_callback,
+                check_interrupt=check_interrupt
             )
 
-            # 基于时间的节流：至少间隔500毫秒
-            should_update_by_time = current_time - last_progress_time >= update_interval
+            # 构建详细的完成消息（单行汇总，避免换行）
+            total = supplement_stats['success_count'] + supplement_stats['empty_data_count'] + supplement_stats['error_count']
+            parts = ["数据补充完成！"]
+            parts.append(f"总股票数: {total}")
+            parts.append(f"成功补充: {supplement_stats['success_count']} 只股票")
+            if supplement_stats['empty_data_count']:
+                parts.append(f"空数据: {supplement_stats['empty_data_count']}")
+            if supplement_stats['error_count']:
+                parts.append(f"出错: {supplement_stats['error_count']}")
+            result_message = "；".join(parts)
 
-            # 满足任一条件即更新（优先使用百分比节流）
-            if should_update_by_percent or should_update_by_time:
-                try:
-                    progress_queue.put(('progress', percent), timeout=1)
-                    last_progress_time = current_time
-                    last_reported_percent = percent
-                    print(f"[GUI进程] 发送进度: {percent}%")  # 调试信息
-                except Exception as e:
-                    print(f"[GUI进程] 发送进度失败: {e}")
-        
-        def log_callback(message):
-            nonlocal last_status_time
-            current_time = time.time()
-            
-            try:
-                # 处理消息的统计和格式化（修复过滤逻辑）
-                # 检查是否是补充数据的成功消息
-                success_pattern = r"^补充\s+(.*?\.\S+)\s+数据成功"
-                success_match = re.match(success_pattern, message)
-                
-                if success_match:
-                    # 这是成功的补充消息，应该显示出来
-                    stock_code = success_match.group(1)
-                    supplement_stats['success_count'] += 1
-                    
-                    # 直接转发成功消息，不修改格式
-                    progress_queue.put(('status', message), timeout=1)
-                    print(f"[GUI进程] 发送成功状态: {message}")  # 调试信息
-                    return
-                
-                # 检查是否是错误消息
-                error_pattern = r"^补充\s+(.*?\.\S+)\s+数据时出错"
-                error_match = re.match(error_pattern, message)
-                
-                if error_match:
-                    # 这是错误消息，应该显示出来
-                    stock_code = error_match.group(1)
-                    supplement_stats['error_count'] += 1
-                    
-                    # 直接转发错误消息
-                    progress_queue.put(('status', message), timeout=1)
-                    print(f"[GUI进程] 发送错误状态: {message}")  # 调试信息
-                    return
-                
-                # 检查是否是空数据消息
-                empty_pattern = r"^补充\s+(.*?\.\S+)\s+数据成功，但数据为空"
-                empty_match = re.match(empty_pattern, message)
-                
-                if empty_match:
-                    # 这是空数据消息，应该显示出来
-                    stock_code = empty_match.group(1)
-                    supplement_stats['empty_data_count'] += 1
-                    if stock_code not in supplement_stats['empty_stocks']:
-                        supplement_stats['empty_stocks'].append(stock_code)
-                    
-                    # 直接转发空数据消息
-                    progress_queue.put(('status', message), timeout=1)
-                    print(f"[GUI进程] 发送空数据状态: {message}")  # 调试信息
-                    return
-                
-                # 重要消息立即发送
-                is_important = any(keyword in str(message) for keyword in ['开始', '完成', '失败', '错误', '中断'])
-                
-                if is_important or current_time - last_status_time >= update_interval:
-                    try:
-                        progress_queue.put(('status', str(message)), timeout=1)
-                        last_status_time = current_time
-                        print(f"[GUI进程] 发送状态: {message}")  # 调试信息
-                    except Exception as e:
-                        print(f"[GUI进程] 发送状态失败: {e}")
-                        
-            except Exception as e:
-                print(f"[GUI进程] log_callback 处理错误: {e}")
-        
-        def check_interrupt():
-            # 检查停止事件
-            return stop_event.is_set()
-        
-        # 执行数据补充
-        supplement_history_data(
-            stock_files=params['stock_files'],
-            field_list=params['field_list'],
-            period_type=params['period_type'],
-            start_date=params['start_date'],
-            end_date=params['end_date'],
-            time_range=params.get('time_range', 'all'),
-            dividend_type=params.get('dividend_type', 'none'),
-            progress_callback=progress_callback,
-            log_callback=log_callback,
-            check_interrupt=check_interrupt
-        )
-        
-        # 构建详细的完成消息（单行汇总，避免换行）
-        total = supplement_stats['success_count'] + supplement_stats['empty_data_count'] + supplement_stats['error_count']
-        parts = ["数据补充完成！"]
-        parts.append(f"总股票数: {total}")
-        parts.append(f"成功补充: {supplement_stats['success_count']} 只股票")
-        if supplement_stats['empty_data_count']:
-            parts.append(f"空数据: {supplement_stats['empty_data_count']}")
-        if supplement_stats['error_count']:
-            parts.append(f"出错: {supplement_stats['error_count']}")
-        result_message = "；".join(parts)
-        
-        # 发送完成信号
-        result_queue.put(('success', result_message.strip()))
-        
-    except Exception as e:
-        error_msg = f"补充数据过程中发生错误: {str(e)}"
-        result_queue.put(('error', error_msg))
-        logging.error(error_msg, exc_info=True)
+            # 发送完成信号
+            result_queue.put(('success', result_message.strip()))
+
+        except Exception as e:
+            error_msg = f"补充数据过程中发生错误: {str(e)}"
+            result_queue.put(('error', error_msg))
+            logging.error(error_msg, exc_info=True)
 
 
 # 添加数据补充线程类（现在使用多进程后端）
@@ -616,10 +620,10 @@ class SupplementThread(QThread):
                         try:
                             msg_type, data = self.progress_queue.get_nowait()
                             if msg_type == 'progress':
-                                print(f"[GUI线程] 接收进度: {data}%")  # 调试信息
+                                logger.debug(f"[GUI线程] 接收进度: {data}%")
                                 self.progress.emit(data)
                             elif msg_type == 'status':
-                                print(f"[GUI线程] 接收状态: {data}")  # 调试信息
+                                logger.debug(f"[GUI线程] 接收状态: {data}")
                                 self.status_update.emit(data)
                         except Empty:
                             break
@@ -1837,36 +1841,36 @@ class StockDataProcessorGUI(QMainWindow):
         icon_path = os.path.join(ICON_PATH, 'stock_icon.ico')
 
     # 打印调试信息
-        print("\n=== 图标加载调试信息 ===")
-        print(f"图标路径: {icon_path}")
-        print(f"ICON_PATH: {ICON_PATH}")
-        print(f"当前工作目录: {os.getcwd()}")
-        print(f"ICON_PATH 是否存在: {os.path.exists(ICON_PATH)}")
-        print(f"图标文件是否存在: {os.path.exists(icon_path)}")
+        logger.debug("\n=== 图标加载调试信息 ===")
+        logger.info(f"图标路径: {icon_path}")
+        logger.info(f"ICON_PATH: {ICON_PATH}")
+        logger.info(f"当前工作目录: {os.getcwd()}")
+        logger.info(f"ICON_PATH 是否存在: {os.path.exists(ICON_PATH)}")
+        logger.info(f"图标文件是否存在: {os.path.exists(icon_path)}")
         
         if os.path.exists(icon_path):
             try:
                 # 检查文件大小
                 file_size = os.path.getsize(icon_path)
-                print(f"图标文件大小: {file_size} 字节")
+                logger.info(f"图标文件大小: {file_size} 字节")
                 
                 # 检查文件权限
-                print(f"文件权限: {oct(os.stat(icon_path).st_mode)[-3:]}")
+                logger.info(f"文件权限: {oct(os.stat(icon_path).st_mode)[-3:]}")
                 
                 # 尝试读取文件
                 with open(icon_path, 'rb') as f:
                     content = f.read(16)  # 读取前16字节
-                print(f"文件头16字节: {content.hex()}")
+                logger.info(f"文件头16字节: {content.hex()}")
                 
                 # 尝试加载图标
                 icon = QIcon(icon_path)
                 if icon.isNull():
-                    print("警告：QIcon返回了空图标")
+                    logger.warning("警告：QIcon返回了空图标")
                 else:
-                    print("QIcon成功加载图标")
+                    logger.info("QIcon成功加载图标")
                     
                 self.setWindowIcon(icon)
-                print("成功设置窗口图标")
+                logger.info("成功设置窗口图标")
                  # 设置应用程序级别的异常处理
                 def qt_message_handler(mode, context, message):
                     if mode == QtCore.QtInfoMsg:
@@ -1882,13 +1886,13 @@ class StockDataProcessorGUI(QMainWindow):
                 
                 QtCore.qInstallMessageHandler(qt_message_handler)
             except Exception as e:
-                print(f"加载图标时出错: {str(e)}")
+                logger.info(f"加载图标时出错: {str(e)}")
                 logging.error(f"加载图标时出错: {str(e)}", exc_info=True)
         else:
-            print(f"图标文件不存在: {icon_path}")
-            print(f"icons目录内容: {os.listdir(self.ICON_PATH) if os.path.exists(self.ICON_PATH) else '目录不存在'}")
+            logger.info(f"图标文件不存在: {icon_path}")
+            logger.info(f"icons目录内容: {os.listdir(self.ICON_PATH) if os.path.exists(self.ICON_PATH) else '目录不存在'}")
             
-        print("=== 调试信息结束 ===\n")
+        logger.debug("=== 调试信息结束 ===\n")
 
         # self.setWindowFlag(Qt.FramelessWindowHint) # 移除
         # self.setAttribute(Qt.WA_TranslucentBackground) # 移除
@@ -3774,7 +3778,7 @@ def setup_logging():
         return log_filename
         
     except Exception as e:
-        print(f"配置日志系统时出错: {str(e)}")
+        logger.info(f"配置日志系统时出错: {str(e)}")
         return None
 
 def get_data_directory():
@@ -3919,6 +3923,6 @@ if __name__ == '__main__':
         
     except Exception as e:
         logging.critical(f"程序异常退出: {str(e)}", exc_info=True)
-        print(f"程序发生严重错误，详细信息已写入日志文件: {log_filename}")
+        logger.error(f"程序发生严重错误，详细信息已写入日志文件: {log_filename}")
         sys.exit(1)
 

@@ -1,9 +1,13 @@
 #!/usr/bin/env python
+from logging_config import get_module_logger
 # -*- coding: utf-8 -*-
 """
 miniQMT数据解析器
 使用xtquant.xtdata.get_local_data处理miniQMT的本地数据
 """
+
+# 日志系统
+logger = get_module_logger(__name__)
 
 import struct
 import os
@@ -83,16 +87,16 @@ class MiniQMTDataParser:
                 if isinstance(tick_df, pd.DataFrame) and not tick_df.empty:
                     self.logger.info(f"找到股票 {full_stock_code} 的tick数据，形状: {tick_df.shape}")
                     self.logger.info(f"tick数据列名: {list(tick_df.columns)}")
-                    print(f"DEBUG: tick数据列名: {list(tick_df.columns)}")  # 添加控制台输出
+                    logger.debug(f"DEBUG: tick数据列名: {list(tick_df.columns)}")
                     
                     # 检查开高低收字段是否存在
                     ohlc_fields = ['open', 'high', 'low', 'close', 'lastClose']
                     missing_ohlc = [field for field in ohlc_fields if field not in tick_df.columns]
                     existing_ohlc = [field for field in ohlc_fields if field in tick_df.columns]
                     if missing_ohlc:
-                        print(f"DEBUG: 缺失的OHLC字段: {missing_ohlc}")
+                        logger.debug(f"DEBUG: 缺失的OHLC字段: {missing_ohlc}")
                     if existing_ohlc:
-                        print(f"DEBUG: 存在的OHLC字段: {existing_ohlc}")
+                        logger.debug(f"DEBUG: 存在的OHLC字段: {existing_ohlc}")
                     
                     # 限制记录数，如果max_records为None则不限制
                     record_count = len(tick_df) if max_records is None else min(len(tick_df), max_records)

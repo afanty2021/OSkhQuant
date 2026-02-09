@@ -8,6 +8,11 @@ import json
 import subprocess
 import shutil
 from datetime import datetime
+from logging_config import get_module_logger
+
+# 日志系统
+logger = get_module_logger(__name__)
+
 from PyQt5.QtCore import (
     Qt,
     QSettings,
@@ -78,15 +83,15 @@ def get_logs_dir():
 
     try:
         os.makedirs(logs_dir, exist_ok=True)
-        print(f"使用日志目录: {logs_dir}")
+        logger.info(f"使用日志目录: {logs_dir}")
         return logs_dir
     except (OSError, PermissionError) as e:
-        print(f"无法使用日志目录 {logs_dir}: {e}")
+        logger.info(f"无法使用日志目录 {logs_dir}: {e}")
         # 备用目录
         import tempfile
         logs_dir = os.path.join(tempfile.gettempdir(), 'KhQuant_logs')
         os.makedirs(logs_dir, exist_ok=True)
-        print(f"使用临时日志目录: {logs_dir}")
+        logger.info(f"使用临时日志目录: {logs_dir}")
         return logs_dir
 
 LOGS_DIR = get_logs_dir()
@@ -100,10 +105,10 @@ try:
         filemode='w',
         encoding='utf-8'
     )
-    print(f"日志文件配置成功: {os.path.join(LOGS_DIR, 'app.log')}")
+    logger.info(f"日志文件配置成功: {os.path.join(LOGS_DIR, 'app.log')}")
 except Exception as e:
     # 如果文件日志配置失败，只使用控制台日志
-    print(f"配置文件日志失败: {e}")
+    logger.error(f"配置文件日志失败: {e}")
     logging.basicConfig(
         level=logging.DEBUG,
         format='%(asctime)s - %(levelname)s - %(message)s'
@@ -881,7 +886,7 @@ class KhQuantGUI(QMainWindow):
                     old_interval = self.log_flush_timer.interval()
                     if new_interval != old_interval:
                         self.log_flush_timer.setInterval(new_interval)
-                        print(f"[日志Flush] 动态调整刷新间隔: {old_interval}ms -> {new_interval}ms "
+                        logger.debug(f"[日志Flush] 动态调整刷新间隔: {old_interval}ms -> {new_interval}ms "
                               f"(缓冲区: {buffer_size}条, 负载: {current_level})")
                     self._current_load_level = current_level
                     self._flush_interval_stable_count = 0
@@ -890,7 +895,7 @@ class KhQuantGUI(QMainWindow):
                 self._flush_interval_stable_count = 0
         except Exception as e:
             # 避免在调整时产生新的异常循环
-            print(f"调整日志刷新间隔时出错: {e}")
+            logger.info(f"调整日志刷新间隔时出错: {e}")
 
     def _on_flush_timer(self):
         """定时器触发的日志刷新处理"""
@@ -905,7 +910,7 @@ class KhQuantGUI(QMainWindow):
                     handler.flush()
         except Exception as e:
             # 避免在日志刷新时产生新的异常循环
-            print(f"刷新日志时出错: {e}")
+            logger.info(f"刷新日志时出错: {e}")
         
     def showEvent(self, event):
         """窗口显示事件"""
@@ -2282,7 +2287,7 @@ class KhQuantGUI(QMainWindow):
             if message:
                 logging.info(message)
         except Exception as e:
-            print(f"状态栏更新失败: {message}")  # 错误时至少输出到控制台
+            logger.error(f"状态栏更新失败: {message}")
 
     def start_strategy(self):
         try:
@@ -3130,7 +3135,7 @@ class KhQuantGUI(QMainWindow):
             self.status_table.resizeColumnsToContents()
             
         except Exception as e:
-            print(f"更新状态表格时出错: {str(e)}")
+            logger.info(f"更新状态表格时出错: {str(e)}")
 
     def select_qmt_path(self):
         """QMT路径设置已移动到设置界面"""
@@ -3279,7 +3284,7 @@ class KhQuantGUI(QMainWindow):
             formatted_message = f'<span style="color: {color}">[{current_time}] [{level}] {message}</span><br>'
             
             # 在终端输出纯文本格式的日志
-            print(f"[{current_time}] [{level}] {message}")
+            logger.info(f"[{current_time}] [{level}] {message}")
             
             # 过滤不需要在界面显示的系统和更新相关的日志
             should_skip_gui_log = False
@@ -3368,9 +3373,9 @@ class KhQuantGUI(QMainWindow):
                     self.delayed_logs.append(log_entry)
                 
         except Exception as e:
-            print(f"记录日志时出错: {str(e)}")
+            logger.info(f"记录日志时出错: {str(e)}")
             import traceback
-            print(traceback.format_exc())
+            logger.debug(traceback.format_exc())
 
     def _trim_log_lines(self):
         """限制日志显示行数，删除最旧的日志行（批量处理以提高性能）"""
@@ -3614,7 +3619,7 @@ class KhQuantGUI(QMainWindow):
             self.status_table.resizeColumnsToContents()
             
         except Exception as e:
-            print(f"更新状态表格时出错: {str(e)}")
+            logger.info(f"更新状态表格时出错: {str(e)}")
 
     def update_status_table(self, time_str, content):
         """发送状态更新信号"""
@@ -4817,9 +4822,9 @@ def khHandlebar(context):
             self.log_error("完成延迟日志显示时出错", e)
             
         except Exception as e:
-            print(f"显示延迟日志时出错: {str(e)}")
+            logger.info(f"显示延迟日志时出错: {str(e)}")
             import traceback
-            print(traceback.format_exc())
+            logger.debug(traceback.format_exc())
             self.log_message(f"显示延迟日志时出错: {str(e)}", "ERROR")
 
     def hide_progress(self):
@@ -5089,7 +5094,7 @@ class NoWheelDateEdit(QDateEdit):
                     self.setFont(font)
                     break
         except Exception as e:
-            print(f"设置DateEdit字体时出错: {str(e)}")
+            logger.info(f"设置DateEdit字体时出错: {str(e)}")
     
     def wheelEvent(self, event):
         # 忽略滚轮事件，不调用父类的wheelEvent
@@ -5115,7 +5120,7 @@ class NoWheelTimeEdit(QTimeEdit):
                     self.setFont(font)
                     break
         except Exception as e:
-            print(f"设置TimeEdit字体时出错: {str(e)}")
+            logger.info(f"设置TimeEdit字体时出错: {str(e)}")
     
     def wheelEvent(self, event):
         # 忽略滚轮事件，不调用父类的wheelEvent
@@ -5382,13 +5387,13 @@ def main():
             
             if default_font:
                 app.setFont(default_font)
-                print(f"已设置应用字体: {default_font.family()}")
+                logger.info(f"已设置应用字体: {default_font.family()}")
             else:
                 # 使用系统默认字体
                 default_font = QFont()
                 default_font.setPointSize(9)
                 app.setFont(default_font)
-                print("使用系统默认字体")
+                logger.info("使用系统默认字体")
             
             # 设置Qt的本地化
             from PyQt5.QtCore import QLocale, QTranslator
@@ -5405,10 +5410,10 @@ def main():
             elif qt_translator.load("qt_zh_CN", ":/translations/"):
                 app.installTranslator(qt_translator)
             
-            print("已设置中文本地化")
+            logger.info("已设置中文本地化")
             
         except Exception as e:
-            print(f"设置字体和本地化时出错: {str(e)}")
+            logger.info(f"设置字体和本地化时出错: {str(e)}")
         
         # 禁用LibPNG警告消息
         os.environ["QT_IMAGEIO_MAXALLOC"] = "0"  # 禁用图像大小限制警告
@@ -5553,8 +5558,8 @@ def main():
                         handler.flush()
                 
                 # 打印到控制台（开发环境用）
-                print(f'[CRITICAL ERROR] {error_msg}')
-                print(f'[TRACEBACK]\n{tb_str}')
+                logger.error(f'[CRITICAL ERROR] {error_msg}')
+                logger.debug(f'[TRACEBACK]\n{tb_str}')
                 
                 # 调用默认异常钩子
                 sys.__excepthook__(exctype, value, tb)
@@ -5578,7 +5583,7 @@ def main():
             return 1
             
     except Exception as e:
-        print(f"程序启动失败: {str(e)}")
+        logger.error(f"程序启动失败: {str(e)}")
         logging.critical(f"程序异常退出: {str(e)}", exc_info=True)
         return 1
 

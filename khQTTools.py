@@ -1,6 +1,11 @@
 # 多进程保护 - 防止在子进程中意外启动Qt应用
+from logging_config import get_module_logger
 import sys
 import os
+
+# 日志系统
+logger = get_module_logger(__name__)
+
 
 # 检查是否在子进程中，只在子进程中设置环境变量
 def is_subprocess():
@@ -1551,7 +1556,7 @@ def get_stock_list():
         for sector_name, dict_key in sector_mapping.items():
             try:
                 logging.info(f"获取{sector_name}股票列表...")
-                print(f"[更新进度] 正在获取{sector_name}股票列表...")
+                logger.info(f"[更新进度] 正在获取{sector_name}股票列表...")
                 stocks = xtdata.get_stock_list_in_sector(sector_name)
                 if stocks:
                     logging.info(f"获取到 {len(stocks)} 只{sector_name}股票")
@@ -1835,11 +1840,11 @@ def get_stock_list_for_subprocess(queue):
     # 获取各个板块的股票
     for sector_name, dict_key in sector_mapping.items():
         queue.put(("progress", f"正在获取{sector_name}股票列表..."))
-        print(f"[更新进度] 正在获取{sector_name}股票列表...", flush=True)
+        logger.info(f"[更新进度] 正在获取{sector_name}股票列表...")
         try:
             stocks = xtdata.get_stock_list_in_sector(sector_name)
             if stocks:
-                print(f"[更新进度] 获取到 {len(stocks)} 只{sector_name}股票，正在处理详细信息...", flush=True)
+                logger.info(f"[更新进度] 获取到 {len(stocks)} 只{sector_name}股票，正在处理详细信息...")
                 processed_count = 0
                 for code in stocks:
                     try:
@@ -1856,26 +1861,26 @@ def get_stock_list_for_subprocess(queue):
                                 processed_count += 1
                                 # 每处理100只股票输出一次进度
                                 if processed_count % 100 == 0:
-                                    print(f"[更新进度] {sector_name} 已处理 {processed_count}/{len(stocks)} 只股票", flush=True)
+                                    logger.info(f"[更新进度] {sector_name} 已处理 {processed_count}/{len(stocks)} 只股票")
                                     queue.put(("progress", f"{sector_name} 已处理 {processed_count}/{len(stocks)} 只股票"))
                     except Exception as e:
                         continue
                 
-                print(f"[更新进度] {sector_name} 完成，共获取 {len(stock_dict[dict_key])} 只有效股票", flush=True)
+                logger.info(f"[更新进度] {sector_name} 完成，共获取 {len(stock_dict[dict_key])} 只有效股票")
             else:
-                print(f"[更新进度] {sector_name} 板块没有股票", flush=True)
+                logger.info(f"[更新进度] {sector_name} 板块没有股票")
 
         except Exception as e:
-            print(f"[更新进度] 获取{sector_name}股票列表失败: {str(e)}", flush=True)
+            logger.error(f"[更新进度] 获取{sector_name}股票列表失败: {str(e)}")
 
     # 获取指数成分股
     for index_name, dict_key in index_components_mapping.items():
         queue.put(("progress", f"正在获取{index_name}成分股..."))
-        print(f"[更新进度] 正在获取{index_name}成分股...", flush=True)
+        logger.info(f"[更新进度] 正在获取{index_name}成分股...")
         try:
             components = xtdata.get_stock_list_in_sector(index_name)
             if components:
-                print(f"[更新进度] 获取到 {len(components)} 只{index_name}成分股，正在处理详细信息...", flush=True)
+                logger.info(f"[更新进度] 获取到 {len(components)} 只{index_name}成分股，正在处理详细信息...")
                 for code in components:
                     try:
                         detail = xtdata.get_instrument_detail(code)
@@ -1889,19 +1894,19 @@ def get_stock_list_for_subprocess(queue):
                                 stock_dict['all_stocks'].append(stock_info)
                     except Exception as e:
                         continue
-                print(f"[更新进度] {index_name} 完成，共获取 {len(stock_dict[dict_key])} 只有效成分股", flush=True)
+                logger.info(f"[更新进度] {index_name} 完成，共获取 {len(stock_dict[dict_key])} 只有效成分股")
             else:
-                print(f"[更新进度] {index_name} 没有成分股", flush=True)
+                logger.info(f"[更新进度] {index_name} 没有成分股")
         except Exception as e:
-            print(f"[更新进度] 获取{index_name}成分股列表失败: {str(e)}", flush=True)
+            logger.error(f"[更新进度] 获取{index_name}成分股列表失败: {str(e)}")
 
     # 获取沪深转债成分股
     queue.put(("progress", "正在获取沪深转债..."))
-    print(f"[更新进度] 正在获取沪深转债...", flush=True)
+    logger.info(f"[更新进度] 正在获取沪深转债...")
     try:
         cb_stocks = xtdata.get_stock_list_in_sector('沪深转债')
         if cb_stocks:
-            print(f"[更新进度] 获取到 {len(cb_stocks)} 只沪深转债，正在筛选转债...", flush=True)
+            logger.info(f"[更新进度] 获取到 {len(cb_stocks)} 只沪深转债，正在筛选转债...")
             for code in cb_stocks:
                 try:
                     detail = xtdata.get_instrument_detail(code)
@@ -1914,19 +1919,19 @@ def get_stock_list_for_subprocess(queue):
                             stock_dict['hs_convertible_bonds'].append(bond_info)
                 except Exception as e:
                     continue
-            print(f"[更新进度] 沪深转债 完成，共获取 {len(stock_dict['hs_convertible_bonds'])} 只有效转债", flush=True)
+            logger.info(f"[更新进度] 沪深转债 完成，共获取 {len(stock_dict['hs_convertible_bonds'])} 只有效转债")
         else:
-            print(f"[更新进度] 沪深转债 没有证券", flush=True)
+            logger.info(f"[更新进度] 沪深转债 没有证券")
     except Exception as e:
-        print(f"[更新进度] 获取沪深转债失败: {str(e)}", flush=True)
+        logger.error(f"[更新进度] 获取沪深转债失败: {str(e)}")
 
     # 获取沪深ETF成分股
     queue.put(("progress", "正在获取沪深ETF..."))
-    print(f"[更新进度] 正在获取沪深ETF...", flush=True)
+    logger.info(f"[更新进度] 正在获取沪深ETF...")
     try:
         etf_stocks = xtdata.get_stock_list_in_sector('沪深ETF')
         if etf_stocks:
-            print(f"[更新进度] 获取到 {len(etf_stocks)} 只沪深ETF，正在处理详细信息...", flush=True)
+            logger.info(f"[更新进度] 获取到 {len(etf_stocks)} 只沪深ETF，正在处理详细信息...")
             for code in etf_stocks:
                 try:
                     detail = xtdata.get_instrument_detail(code)
@@ -1939,11 +1944,11 @@ def get_stock_list_for_subprocess(queue):
                             stock_dict['hs_etf'].append(etf_info)
                 except Exception as e:
                     continue
-            print(f"[更新进度] 沪深ETF 完成，共获取 {len(stock_dict['hs_etf'])} 只有效ETF", flush=True)
+            logger.info(f"[更新进度] 沪深ETF 完成，共获取 {len(stock_dict['hs_etf'])} 只有效ETF")
         else:
-            print(f"[更新进度] 沪深ETF 没有证券", flush=True)
+            logger.info(f"[更新进度] 沪深ETF 没有证券")
     except Exception as e:
-        print(f"[更新进度] 获取沪深ETF失败: {str(e)}", flush=True)
+        logger.error(f"[更新进度] 获取沪深ETF失败: {str(e)}")
 
     # 添加指数
     stock_dict['indices'] = important_indices
@@ -1983,7 +1988,7 @@ def save_stock_list_to_csv_for_subprocess(stock_dict, output_dir, queue):
 
     for board, stocks in stock_dict.items():
         queue.put(("progress", f"正在保存{board_names[board]}列表..."))
-        print(f"[更新进度] 正在保存{board_names[board]}列表...", flush=True)
+        logger.info(f"[更新进度] 正在保存{board_names[board]}列表...")
         # 沪深转债使用特定文件名
         if board == 'hs_convertible_bonds':
             file_path = os.path.join(output_dir, "沪深转债_列表.csv")
@@ -1994,7 +1999,7 @@ def save_stock_list_to_csv_for_subprocess(stock_dict, output_dir, queue):
         with open(file_path, 'w', encoding='utf-8-sig') as f:
             for stock in stocks:
                 f.write(f"{stock['code']},{stock['name']}\n")
-        print(f"[更新进度] {board_names[board]}列表保存完成，共 {len(stocks)} 只证券", flush=True)
+        logger.info(f"[更新进度] {board_names[board]}列表保存完成，共 {len(stocks)} 只证券")
 
 # 定义多进程版本的更新管理器类
 if not is_subprocess():
@@ -2145,28 +2150,28 @@ else:
 
             progress_msg = "正在初始化客户端连接..."
             self.progress.emit(progress_msg)
-            print(f"[更新进度] {progress_msg}", flush=True)
+            logger.info(f"[更新进度] {progress_msg}")
             # c = get_client()
             # if not c.connect():
             #     raise Exception("无法连接到 miniQMT 客户端")
 
             progress_msg = "正在下载板块数据..."
             self.progress.emit(progress_msg)
-            print(f"[更新进度] {progress_msg}", flush=True)
+            logger.info(f"[更新进度] {progress_msg}")
             xtdata.download_sector_data()
-            print("[更新进度] 板块数据下载完成", flush=True)
+            logger.info("[更新进度] 板块数据下载完成")
 
             progress_msg = "正在获取股票列表..."
             self.progress.emit(progress_msg)
-            print(f"[更新进度] {progress_msg}", flush=True)
+            logger.info(f"[更新进度] {progress_msg}")
             stock_dict = self.get_stock_list()
-            print("[更新进度] 股票列表获取完成", flush=True)
+            logger.info("[更新进度] 股票列表获取完成")
 
             progress_msg = "正在保存股票列表..."
             self.progress.emit(progress_msg)
-            print(f"[更新进度] {progress_msg}", flush=True)
+            logger.info(f"[更新进度] {progress_msg}")
             self.save_stock_list_to_csv(stock_dict)
-            print("[更新进度] 股票列表保存完成", flush=True)
+            logger.info("[更新进度] 股票列表保存完成")
 
             if self.running:
                 self.finished.emit(True, "股票列表更新成功！")
@@ -2231,11 +2236,11 @@ else:
 
             progress_msg = f"正在获取{sector_name}股票列表..."
             self.progress.emit(progress_msg)
-            print(f"[更新进度] {progress_msg}", flush=True)
+            logger.info(f"[更新进度] {progress_msg}")
             try:
                 stocks = xtdata.get_stock_list_in_sector(sector_name)
                 if stocks:
-                    print(f"[更新进度] 获取到 {len(stocks)} 只{sector_name}股票，正在处理详细信息...", flush=True)
+                    logger.info(f"[更新进度] 获取到 {len(stocks)} 只{sector_name}股票，正在处理详细信息...")
                     processed_count = 0
                     for code in stocks:
                         if not self.running:
@@ -2254,18 +2259,18 @@ else:
                                     processed_count += 1
                                     # 每处理100只股票输出一次进度
                                     if processed_count % 100 == 0:
-                                        print(f"[更新进度] {sector_name} 已处理 {processed_count}/{len(stocks)} 只股票", flush=True)
+                                        logger.info(f"[更新进度] {sector_name} 已处理 {processed_count}/{len(stocks)} 只股票")
                         except Exception as e:
                             logging.error(f"处理股票 {code} 时出错: {str(e)}")
                             continue
                     
-                    print(f"[更新进度] {sector_name} 完成，共获取 {len(stock_dict[dict_key])} 只有效股票", flush=True)
+                    logger.info(f"[更新进度] {sector_name} 完成，共获取 {len(stock_dict[dict_key])} 只有效股票")
                 else:
-                    print(f"[更新进度] {sector_name} 板块没有股票", flush=True)
+                    logger.info(f"[更新进度] {sector_name} 板块没有股票")
 
             except Exception as e:
                 logging.error(f"获取{sector_name}股票列表时出错: {str(e)}")
-                print(f"[更新进度] 获取{sector_name}股票列表失败: {str(e)}", flush=True)
+                logger.error(f"[更新进度] 获取{sector_name}股票列表失败: {str(e)}")
 
         # 获取指数成分股
         for index_name, dict_key in index_components_mapping.items():
@@ -2274,11 +2279,11 @@ else:
 
             progress_msg = f"正在获取{index_name}成分股..."
             self.progress.emit(progress_msg)
-            print(f"[更新进度] {progress_msg}", flush=True)
+            logger.info(f"[更新进度] {progress_msg}")
             try:
                 components = xtdata.get_stock_list_in_sector(index_name)
                 if components:
-                    print(f"[更新进度] 获取到 {len(components)} 只{index_name}成分股，正在处理详细信息...", flush=True)
+                    logger.info(f"[更新进度] 获取到 {len(components)} 只{index_name}成分股，正在处理详细信息...")
                     for code in components:
                         if not self.running:
                             return stock_dict
@@ -2295,12 +2300,12 @@ else:
                         except Exception as e:
                             logging.error(f"处理{index_name}成分股 {code} 时出错: {str(e)}")
                             continue
-                    print(f"[更新进度] {index_name} 完成，共获取 {len(stock_dict[dict_key])} 只有效成分股", flush=True)
+                    logger.info(f"[更新进度] {index_name} 完成，共获取 {len(stock_dict[dict_key])} 只有效成分股")
                 else:
-                    print(f"[更新进度] {index_name} 没有成分股", flush=True)
+                    logger.info(f"[更新进度] {index_name} 没有成分股")
             except Exception as e:
                 logging.error(f"获取{index_name}成分股列表时出错: {str(e)}")
-                print(f"[更新进度] 获取{index_name}成分股列表失败: {str(e)}", flush=True)
+                logger.error(f"[更新进度] 获取{index_name}成分股列表失败: {str(e)}")
 
         # 获取沪深转债成分股
         convertible_bonds_mapping = {
@@ -2313,11 +2318,11 @@ else:
                 
             progress_msg = f"正在获取{cb_name}..."
             self.progress.emit(progress_msg)
-            print(f"[更新进度] {progress_msg}", flush=True)
+            logger.info(f"[更新进度] {progress_msg}")
             try:
                 cb_stocks = xtdata.get_stock_list_in_sector(cb_name)
                 if cb_stocks:
-                    print(f"[更新进度] 获取到 {len(cb_stocks)} 只{cb_name}，正在筛选转债...", flush=True)
+                    logger.info(f"[更新进度] 获取到 {len(cb_stocks)} 只{cb_name}，正在筛选转债...")
                     for code in cb_stocks:
                         if not self.running:
                             return stock_dict
@@ -2333,11 +2338,11 @@ else:
                                     # 不将转债添加到all_stocks中，因为它们是债券而非股票
                         except Exception as e:
                             continue
-                    print(f"[更新进度] {cb_name} 完成，共获取 {len(stock_dict[dict_key])} 只有效转债", flush=True)
+                    logger.info(f"[更新进度] {cb_name} 完成，共获取 {len(stock_dict[dict_key])} 只有效转债")
                 else:
-                    print(f"[更新进度] {cb_name} 没有证券", flush=True)
+                    logger.info(f"[更新进度] {cb_name} 没有证券")
             except Exception as e:
-                print(f"[更新进度] 获取{cb_name}失败: {str(e)}", flush=True)
+                logger.error(f"[更新进度] 获取{cb_name}失败: {str(e)}")
 
         # 获取沪深ETF成分股
         etf_mapping = {
@@ -2350,11 +2355,11 @@ else:
                 
             progress_msg = f"正在获取{etf_name}..."
             self.progress.emit(progress_msg)
-            print(f"[更新进度] {progress_msg}", flush=True)
+            logger.info(f"[更新进度] {progress_msg}")
             try:
                 etf_stocks = xtdata.get_stock_list_in_sector(etf_name)
                 if etf_stocks:
-                    print(f"[更新进度] 获取到 {len(etf_stocks)} 只{etf_name}，正在处理详细信息...", flush=True)
+                    logger.info(f"[更新进度] 获取到 {len(etf_stocks)} 只{etf_name}，正在处理详细信息...")
                     for code in etf_stocks:
                         if not self.running:
                             return stock_dict
@@ -2370,11 +2375,11 @@ else:
                                     # 不将ETF添加到all_stocks中，因为它们是基金而非股票
                         except Exception as e:
                             continue
-                    print(f"[更新进度] {etf_name} 完成，共获取 {len(stock_dict[dict_key])} 只有效ETF", flush=True)
+                    logger.info(f"[更新进度] {etf_name} 完成，共获取 {len(stock_dict[dict_key])} 只有效ETF")
                 else:
-                    print(f"[更新进度] {etf_name} 没有证券", flush=True)
+                    logger.info(f"[更新进度] {etf_name} 没有证券")
             except Exception as e:
-                print(f"[更新进度] 获取{etf_name}失败: {str(e)}", flush=True)
+                logger.error(f"[更新进度] 获取{etf_name}失败: {str(e)}")
 
         # 添加指数
         stock_dict['indices'] = important_indices
@@ -2415,7 +2420,7 @@ else:
                 return
             progress_msg = f"正在保存{board_names[board]}列表..."
             self.progress.emit(progress_msg)
-            print(f"[更新进度] {progress_msg}", flush=True)
+            logger.info(f"[更新进度] {progress_msg}")
             # 沪深转债使用特定文件名
             if board == 'hs_convertible_bonds':
                 file_path = os.path.join(self.output_dir, "沪深转债_列表.csv")
@@ -2426,7 +2431,7 @@ else:
             with open(file_path, 'w', encoding='utf-8-sig') as f:
                 for stock in stocks:
                     f.write(f"{stock['code']},{stock['name']}\n")
-            print(f"[更新进度] {board_names[board]}列表保存完成，共 {len(stocks)} 只证券", flush=True)
+            logger.info(f"[更新进度] {board_names[board]}列表保存完成，共 {len(stocks)} 只证券")
 
 def supplement_history_data(stock_files, field_list, period_type, start_date, end_date, dividend_type='none', time_range='all', progress_callback=None, log_callback=None, check_interrupt=None):
     """
@@ -2637,7 +2642,7 @@ def khHistory(symbol_list, fields, bar_count, fre_step, current_time=None, skip_
         import pandas as pd
         from datetime import datetime, timedelta
     except ImportError as e:
-        print(f"导入模块失败: {str(e)}")
+        logger.error(f"导入模块失败: {str(e)}")
         return {}
     
     # 参数验证
@@ -2713,7 +2718,7 @@ def khHistory(symbol_list, fields, bar_count, fre_step, current_time=None, skip_
     try:
         if force_download:
             # 强制下载模式：先下载最新数据到指定时间，再获取
-            print(f"强制下载模式：基于时间 {current_date_str} 下载最新数据")
+            logger.info(f"强制下载模式：基于时间 {current_date_str} 下载最新数据")
             
             # 根据当前时间和bar_count计算开始时间
             start_date = None
@@ -2735,10 +2740,10 @@ def khHistory(symbol_list, fields, bar_count, fre_step, current_time=None, skip_
                 start_dt = current_datetime - timedelta(days=target_days)
                 start_date = start_dt.strftime('%Y%m%d')
                 
-                print(f"计算的数据范围: {start_date} 到 {current_date_str}")
+                logger.info(f"计算的数据范围: {start_date} 到 {current_date_str}")
                 
             except Exception as e:
-                print(f"计算时间范围出错: {str(e)}")
+                logger.info(f"计算时间范围出错: {str(e)}")
                 # 如果计算失败，使用默认的往前推算逻辑
                 start_dt = current_datetime - timedelta(days=bar_count * 5)
                 start_date = start_dt.strftime('%Y%m%d')
@@ -2755,9 +2760,9 @@ def khHistory(symbol_list, fields, bar_count, fre_step, current_time=None, skip_
                     )
                     download_count += 1
                 except Exception as e:
-                    print(f"下载 {stock_code} 数据失败: {str(e)}")
+                    logger.error(f"下载 {stock_code} 数据失败: {str(e)}")
             
-            print(f"成功下载 {download_count}/{len(stock_codes)} 只股票的数据")
+            logger.info(f"成功下载 {download_count}/{len(stock_codes)} 只股票的数据")
         
         # 使用xtdata.get_market_data_ex获取数据
         #print(f"从本地获取数据，基于时间: {current_datetime.strftime('%Y-%m-%d %H:%M:%S')}")
@@ -2795,20 +2800,20 @@ def khHistory(symbol_list, fields, bar_count, fre_step, current_time=None, skip_
         )
         
         if not data:
-            print("未获取到任何数据")
+            logger.info("未获取到任何数据")
             return {}
         
         # 处理每只股票的数据
         for stock_code in stock_codes:
             if stock_code not in data:
-                print(f"警告: 股票 {stock_code} 无数据")
+                logger.warning(f"警告: 股票 {stock_code} 无数据")
                 result[stock_code] = pd.DataFrame()
                 continue
             
             stock_data = data[stock_code]
             
             if stock_data is None or stock_data.empty:
-                print(f"警告: 股票 {stock_code} 数据为空")
+                logger.warning(f"警告: 股票 {stock_code} 数据为空")
                 result[stock_code] = pd.DataFrame()
                 continue
             
@@ -2843,7 +2848,7 @@ def khHistory(symbol_list, fields, bar_count, fre_step, current_time=None, skip_
                 stock_data = stock_data[stock_data['volume'] > 0].reset_index(drop=True)
                 filtered_len = len(stock_data)
                 if original_len != filtered_len:
-                    print(f"股票 {stock_code} 过滤停牌数据: {original_len} -> {filtered_len}")
+                    logger.info(f"股票 {stock_code} 过滤停牌数据: {original_len} -> {filtered_len}")
             
             # 取最近的bar_count条记录
             if not stock_data.empty and len(stock_data) > bar_count:
@@ -2865,14 +2870,14 @@ def khHistory(symbol_list, fields, bar_count, fre_step, current_time=None, skip_
                 if period in ['1d']:
                     latest_date = stock_data['time'].dt.date.max()
                     if latest_date >= current_datetime.date():
-                        print(f"  [WARN]️ 警告: 数据包含当前日期或之后的日期")
+                        logger.warning(f"  [WARN]️ 警告: 数据包含当前日期或之后的日期")
                 else:
                     latest_time = stock_data['time'].max()
                     if latest_time >= current_datetime:
-                        print(f"  [WARN]️ 警告: 数据包含当前时间或之后的时间")
+                        logger.warning(f"  [WARN]️ 警告: 数据包含当前时间或之后的时间")
     
     except Exception as e:
-        print(f"获取历史数据时出错: {str(e)}")
+        logger.info(f"获取历史数据时出错: {str(e)}")
         import traceback
         traceback.print_exc()
         return {}
@@ -3636,13 +3641,13 @@ def _get_day_kline(
 
 def test_khKline():
     """测试khKline函数的各种参数组合"""
-    print("=" * 60)
-    print("开始测试khKline函数...")
-    print("=" * 60)
+    logger.info("=" * 60)
+    logger.info("开始测试khKline函数...")
+    logger.info("=" * 60)
     
     # 测试1: 基本分钟周期测试
-    print("\n测试1: 基本分钟周期测试（1m, 5m, 15m）")
-    print("-" * 50)
+    logger.info("\n测试1: 基本分钟周期测试（1m, 5m, 15m）")
+    logger.info("-" * 50)
     for period in ['1m', '5m', '15m']:
         try:
             result = khKline(
@@ -3653,18 +3658,18 @@ def test_khKline():
             )
             if '000001.SZ' in result and not result['000001.SZ'].empty:
                 df = result['000001.SZ']
-                print(f"[OK] {period}周期: 获取 {len(df)} 条记录")
+                logger.info(f"[OK] {period}周期: 获取 {len(df)} 条记录")
                 if 'time' in df.columns and len(df) > 0:
                     time_range = f"{df['time'].min()} 到 {df['time'].max()}"
-                    print(f"  时间范围: {time_range}")
+                    logger.info(f"  时间范围: {time_range}")
             else:
-                print(f"[FAIL] {period}周期: 未获取到数据")
+                logger.error(f"[FAIL] {period}周期: 未获取到数据")
         except Exception as e:
-            print(f"[FAIL] {period}周期: 出错 - {str(e)}")
+            logger.error(f"[FAIL] {period}周期: 出错 - {str(e)}")
     
     # 测试2: 小时周期测试
-    print("\n测试2: 小时周期测试（1h, 2h）")
-    print("-" * 50)
+    logger.info("\n测试2: 小时周期测试（1h, 2h）")
+    logger.info("-" * 50)
     for period in ['1h', '2h']:
         try:
             result = khKline(
@@ -3675,18 +3680,18 @@ def test_khKline():
             )
             if '000001.SZ' in result and not result['000001.SZ'].empty:
                 df = result['000001.SZ']
-                print(f"[OK] {period}周期: 获取 {len(df)} 条记录")
+                logger.info(f"[OK] {period}周期: 获取 {len(df)} 条记录")
                 if 'time' in df.columns and len(df) > 0:
                     time_range = f"{df['time'].min()} 到 {df['time'].max()}"
-                    print(f"  时间范围: {time_range}")
+                    logger.info(f"  时间范围: {time_range}")
             else:
-                print(f"[FAIL] {period}周期: 未获取到数据")
+                logger.error(f"[FAIL] {period}周期: 未获取到数据")
         except Exception as e:
-            print(f"[FAIL] {period}周期: 出错 - {str(e)}")
+            logger.error(f"[FAIL] {period}周期: 出错 - {str(e)}")
     
     # 测试3: 日线周期测试
-    print("\n测试3: 日线周期测试（1d, 2d, 3d）")
-    print("-" * 50)
+    logger.info("\n测试3: 日线周期测试（1d, 2d, 3d）")
+    logger.info("-" * 50)
     for period in ['1d', '2d', '3d']:
         try:
             result = khKline(
@@ -3697,18 +3702,18 @@ def test_khKline():
             )
             if '000001.SZ' in result and not result['000001.SZ'].empty:
                 df = result['000001.SZ']
-                print(f"[OK] {period}周期: 获取 {len(df)} 条记录")
+                logger.info(f"[OK] {period}周期: 获取 {len(df)} 条记录")
                 if 'time' in df.columns and len(df) > 0:
                     time_range = f"{df['time'].min()} 到 {df['time'].max()}"
-                    print(f"  时间范围: {time_range}")
+                    logger.info(f"  时间范围: {time_range}")
             else:
-                print(f"[FAIL] {period}周期: 未获取到数据")
+                logger.error(f"[FAIL] {period}周期: 未获取到数据")
         except Exception as e:
-            print(f"[FAIL] {period}周期: 出错 - {str(e)}")
+            logger.error(f"[FAIL] {period}周期: 出错 - {str(e)}")
     
     # 测试4: 指定end_time测试
-    print("\n测试4: 指定历史时间点测试")
-    print("-" * 50)
+    logger.info("\n测试4: 指定历史时间点测试")
+    logger.info("-" * 50)
     test_times = [
         ('1m', '20241201 1430'),
         ('1h', '20241201 1400'),
@@ -3725,18 +3730,18 @@ def test_khKline():
             )
             if '000001.SZ' in result and not result['000001.SZ'].empty:
                 df = result['000001.SZ']
-                print(f"[OK] {period}周期到{end_time}: 获取 {len(df)} 条记录")
+                logger.info(f"[OK] {period}周期到{end_time}: 获取 {len(df)} 条记录")
                 if 'time' in df.columns and len(df) > 0:
                     latest_time = df['time'].max()
-                    print(f"  最新时间: {latest_time}")
+                    logger.info(f"  最新时间: {latest_time}")
             else:
-                print(f"[FAIL] {period}周期到{end_time}: 未获取到数据")
+                logger.error(f"[FAIL] {period}周期到{end_time}: 未获取到数据")
         except Exception as e:
-            print(f"[FAIL] {period}周期到{end_time}: 出错 - {str(e)}")
+            logger.error(f"[FAIL] {period}周期到{end_time}: 出错 - {str(e)}")
     
     # 测试5: 多股票测试
-    print("\n测试5: 多股票同时获取测试")
-    print("-" * 50)
+    logger.info("\n测试5: 多股票同时获取测试")
+    logger.info("-" * 50)
     try:
         result = khKline(
             symbol_list=['000001.SZ', '600000.SH'],
@@ -3747,15 +3752,15 @@ def test_khKline():
         for stock_code in ['000001.SZ', '600000.SH']:
             if stock_code in result and not result[stock_code].empty:
                 df = result[stock_code]
-                print(f"[OK] {stock_code}: 获取 {len(df)} 条记录")
+                logger.info(f"[OK] {stock_code}: 获取 {len(df)} 条记录")
             else:
-                print(f"[FAIL] {stock_code}: 未获取到数据")
+                logger.error(f"[FAIL] {stock_code}: 未获取到数据")
     except Exception as e:
-        print(f"[FAIL] 多股票测试: 出错 - {str(e)}")
+        logger.error(f"[FAIL] 多股票测试: 出错 - {str(e)}")
     
     # 测试6: 年对齐验证（多日周期）
-    print("\n测试6: 年对齐验证测试（2d, 5d）")
-    print("-" * 50)
+    logger.info("\n测试6: 年对齐验证测试（2d, 5d）")
+    logger.info("-" * 50)
     for period in ['2d', '5d']:
         try:
             result = khKline(
@@ -3777,23 +3782,23 @@ def test_khKline():
                     if len(times1) == len(times2):
                         aligned = all(t1 == t2 for t1, t2 in zip(times1, times2))
                         if aligned:
-                            print(f"[OK] {period}周期年对齐验证通过: 两只股票K线时间完全一致")
-                            print(f"  000001.SZ: {len(df1)} 条记录")
-                            print(f"  600000.SH: {len(df2)} 条记录")
+                            logger.info(f"[OK] {period}周期年对齐验证通过: 两只股票K线时间完全一致")
+                            logger.info(f"  000001.SZ: {len(df1)} 条记录")
+                            logger.info(f"  600000.SH: {len(df2)} 条记录")
                         else:
-                            print(f"[WARN] {period}周期: 两只股票K线时间不一致")
+                            logger.warning(f"[WARN] {period}周期: 两只股票K线时间不一致")
                     else:
-                        print(f"[WARN] {period}周期: 两只股票K线数量不同 ({len(times1)} vs {len(times2)})")
+                        logger.warning(f"[WARN] {period}周期: 两只股票K线数量不同 ({len(times1)} vs {len(times2)})")
                 else:
-                    print(f"[FAIL] {period}周期: 有股票数据为空")
+                    logger.error(f"[FAIL] {period}周期: 有股票数据为空")
             else:
-                print(f"[FAIL] {period}周期: 未获取到完整数据")
+                logger.error(f"[FAIL] {period}周期: 未获取到完整数据")
         except Exception as e:
-            print(f"[FAIL] {period}周期年对齐测试: 出错 - {str(e)}")
+            logger.error(f"[FAIL] {period}周期年对齐测试: 出错 - {str(e)}")
     
     # 测试7: 自定义字段测试
-    print("\n测试7: 自定义字段测试")
-    print("-" * 50)
+    logger.info("\n测试7: 自定义字段测试")
+    logger.info("-" * 50)
     try:
         result = khKline(
             symbol_list='000001.SZ',
@@ -3805,20 +3810,20 @@ def test_khKline():
         if '000001.SZ' in result and not result['000001.SZ'].empty:
             df = result['000001.SZ']
             columns = df.columns.tolist()
-            print(f"[OK] 自定义字段测试: 获取 {len(df)} 条记录")
-            print(f"  字段列表: {columns}")
+            logger.info(f"[OK] 自定义字段测试: 获取 {len(df)} 条记录")
+            logger.info(f"  字段列表: {columns}")
             if set(['time', 'open', 'close', 'volume']).issubset(set(columns)):
-                print(f"  [OK] 字段验证通过")
+                logger.info(f"  [OK] 字段验证通过")
             else:
-                print(f"  [FAIL] 字段验证失败: 缺少预期字段")
+                logger.error(f"  [FAIL] 字段验证失败: 缺少预期字段")
         else:
-            print(f"[FAIL] 自定义字段测试: 未获取到数据")
+            logger.error(f"[FAIL] 自定义字段测试: 未获取到数据")
     except Exception as e:
-        print(f"[FAIL] 自定义字段测试: 出错 - {str(e)}")
+        logger.error(f"[FAIL] 自定义字段测试: 出错 - {str(e)}")
     
     # 测试8: 复权方式测试
-    print("\n测试8: 复权方式测试")
-    print("-" * 50)
+    logger.info("\n测试8: 复权方式测试")
+    logger.info("-" * 50)
     for fq_type in ['none', 'pre', 'post']:
         try:
             result = khKline(
@@ -3832,25 +3837,25 @@ def test_khKline():
             if '000001.SZ' in result and not result['000001.SZ'].empty:
                 df = result['000001.SZ']
                 close_prices = df['close'].tolist()
-                print(f"[OK] 复权方式{fq_type}: 收盘价 {close_prices}")
+                logger.info(f"[OK] 复权方式{fq_type}: 收盘价 {close_prices}")
             else:
-                print(f"[FAIL] 复权方式{fq_type}: 未获取到数据")
+                logger.error(f"[FAIL] 复权方式{fq_type}: 未获取到数据")
         except Exception as e:
-            print(f"[FAIL] 复权方式{fq_type}: 出错 - {str(e)}")
+            logger.error(f"[FAIL] 复权方式{fq_type}: 出错 - {str(e)}")
     
-    print("\n" + "=" * 60)
-    print("khKline函数测试完成")
-    print("=" * 60)
+    logger.info("\n" + "=" * 60)
+    logger.info("khKline函数测试完成")
+    logger.info("=" * 60)
 
 
 def test_khHistory():
     """测试khHistory函数的各种参数组合"""
-    print("开始测试khHistory函数...")
-    print("=" * 50)
+    logger.info("开始测试khHistory函数...")
+    logger.info("=" * 50)
     
     # 测试1: 基本功能测试（使用当前时间）
-    print("\n测试1: 基本功能测试（当前时间）")
-    print("-" * 40)
+    logger.info("\n测试1: 基本功能测试（当前时间）")
+    logger.info("-" * 40)
     try:
         result1 = khHistory(
             symbol_list='000001.SZ',
@@ -3861,27 +3866,27 @@ def test_khHistory():
         )
         if '000001.SZ' in result1 and not result1['000001.SZ'].empty:
             df = result1['000001.SZ']
-            print(f"[OK] 当前时间测试: 获取 {len(df)} 条记录")
-            print(f"  列名: {list(df.columns)}")
+            logger.info(f"[OK] 当前时间测试: 获取 {len(df)} 条记录")
+            logger.info(f"  列名: {list(df.columns)}")
             if 'time' in df.columns:
                 time_range = f"{df['time'].min()} 到 {df['time'].max()}"
-                print(f"  时间范围: {time_range}")
+                logger.info(f"  时间范围: {time_range}")
                 # 验证不包含当前日期
                 from datetime import datetime
                 today = datetime.now().date()
                 latest_date = df['time'].dt.date.max()
                 if latest_date < today:
-                    print(f"  [OK] 验证通过: 数据不包含当前日期 {today}")
+                    logger.info(f"  [OK] 验证通过: 数据不包含当前日期 {today}")
                 else:
-                    print(f"  [FAIL] 验证失败: 数据包含当前日期或之后的日期")
+                    logger.error(f"  [FAIL] 验证失败: 数据包含当前日期或之后的日期")
         else:
-            print("[FAIL] 当前时间测试: 未获取到数据")
+            logger.error("[FAIL] 当前时间测试: 未获取到数据")
     except Exception as e:
-        print(f"[FAIL] 当前时间测试: 出错 - {str(e)}")
+        logger.error(f"[FAIL] 当前时间测试: 出错 - {str(e)}")
     
     # 测试2: 指定历史日期测试
-    print("\n测试2: 指定历史日期测试")
-    print("-" * 40)
+    logger.info("\n测试2: 指定历史日期测试")
+    logger.info("-" * 40)
     test_dates = ['20241201', '2024-12-01', '20241115']
     
     for test_date in test_dates:
@@ -3896,10 +3901,10 @@ def test_khHistory():
             )
             if '000001.SZ' in result2 and not result2['000001.SZ'].empty:
                 df = result2['000001.SZ']
-                print(f"[OK] 日期{test_date}: 获取 {len(df)} 条记录")
+                logger.info(f"[OK] 日期{test_date}: 获取 {len(df)} 条记录")
                 if 'time' in df.columns:
                     time_range = f"{df['time'].min()} 到 {df['time'].max()}"
-                    print(f"  时间范围: {time_range}")
+                    logger.info(f"  时间范围: {time_range}")
                     # 验证不包含指定日期
                     from datetime import datetime
                     if '-' in test_date:
@@ -3908,17 +3913,17 @@ def test_khHistory():
                         target_date = datetime.strptime(test_date, '%Y%m%d').date()
                     latest_date = df['time'].dt.date.max()
                     if latest_date < target_date:
-                        print(f"  [OK] 验证通过: 数据不包含目标日期 {target_date}")
+                        logger.info(f"  [OK] 验证通过: 数据不包含目标日期 {target_date}")
                     else:
-                        print(f"  [FAIL] 验证失败: 数据包含目标日期或之后的日期")
+                        logger.error(f"  [FAIL] 验证失败: 数据包含目标日期或之后的日期")
             else:
-                print(f"[FAIL] 日期{test_date}: 未获取到数据")
+                logger.error(f"[FAIL] 日期{test_date}: 未获取到数据")
         except Exception as e:
-            print(f"[FAIL] 日期{test_date}: 出错 - {str(e)}")
+            logger.error(f"[FAIL] 日期{test_date}: 出错 - {str(e)}")
     
     # 测试3: 指定精确时间测试（分钟数据）
-    print("\n测试3: 指定精确时间测试（分钟数据）")
-    print("-" * 40)
+    logger.info("\n测试3: 指定精确时间测试（分钟数据）")
+    logger.info("-" * 40)
     test_times = [
         '20241201 143000',      # YYYYMMDD HHMMSS
         '2024-12-01 14:30:00',  # YYYY-MM-DD HH:MM:SS
@@ -3938,10 +3943,10 @@ def test_khHistory():
             )
             if '000001.SZ' in result3 and not result3['000001.SZ'].empty:
                 df = result3['000001.SZ']
-                print(f"[OK] 时间{test_time}: 获取 {len(df)} 条记录")
+                logger.info(f"[OK] 时间{test_time}: 获取 {len(df)} 条记录")
                 if 'time' in df.columns:
                     time_range = f"{df['time'].min()} 到 {df['time'].max()}"
-                    print(f"  时间范围: {time_range}")
+                    logger.info(f"  时间范围: {time_range}")
                     # 验证不包含指定时间
                     from datetime import datetime
                     if ' ' in test_time:
@@ -3954,17 +3959,17 @@ def test_khHistory():
                     
                     latest_time = df['time'].max()
                     if latest_time < target_time:
-                        print(f"  [OK] 验证通过: 数据不包含目标时间 {target_time}")
+                        logger.info(f"  [OK] 验证通过: 数据不包含目标时间 {target_time}")
                     else:
-                        print(f"  [FAIL] 验证失败: 数据包含目标时间或之后的时间")
+                        logger.error(f"  [FAIL] 验证失败: 数据包含目标时间或之后的时间")
             else:
-                print(f"[FAIL] 时间{test_time}: 未获取到数据")
+                logger.error(f"[FAIL] 时间{test_time}: 未获取到数据")
         except Exception as e:
-            print(f"[FAIL] 时间{test_time}: 出错 - {str(e)}")
+            logger.error(f"[FAIL] 时间{test_time}: 出错 - {str(e)}")
     
     # 测试4: 多股票测试（指定时间）
-    print("\n测试4: 多股票测试（指定时间）")
-    print("-" * 40)
+    logger.info("\n测试4: 多股票测试（指定时间）")
+    logger.info("-" * 40)
     try:
         result4 = khHistory(
             symbol_list=['000001.SZ', '600000.SH'],
@@ -3977,15 +3982,15 @@ def test_khHistory():
         for stock_code in ['000001.SZ', '600000.SH']:
             if stock_code in result4 and not result4[stock_code].empty:
                 df = result4[stock_code]
-                print(f"[OK] {stock_code}: 获取 {len(df)} 条记录")
+                logger.info(f"[OK] {stock_code}: 获取 {len(df)} 条记录")
             else:
-                print(f"[FAIL] {stock_code}: 未获取到数据")
+                logger.error(f"[FAIL] {stock_code}: 未获取到数据")
     except Exception as e:
-        print(f"[FAIL] 多股票测试: 出错 - {str(e)}")
+        logger.error(f"[FAIL] 多股票测试: 出错 - {str(e)}")
     
     # 测试5: 跳过停牌数据测试（指定时间）
-    print("\n测试5: 跳过停牌数据测试（指定时间）")
-    print("-" * 40)
+    logger.info("\n测试5: 跳过停牌数据测试（指定时间）")
+    logger.info("-" * 40)
     for skip in [False, True]:
         try:
             result5 = khHistory(
@@ -4000,15 +4005,15 @@ def test_khHistory():
             if '000001.SZ' in result5 and not result5['000001.SZ'].empty:
                 df = result5['000001.SZ']
                 zero_volume_count = (df['volume'] == 0).sum()
-                print(f"[OK] 跳过停牌={skip}: 获取 {len(df)} 条记录，其中成交量为0的有 {zero_volume_count} 条")
+                logger.info(f"[OK] 跳过停牌={skip}: 获取 {len(df)} 条记录，其中成交量为0的有 {zero_volume_count} 条")
             else:
-                print(f"[FAIL] 跳过停牌={skip}: 未获取到数据")
+                logger.error(f"[FAIL] 跳过停牌={skip}: 未获取到数据")
         except Exception as e:
-            print(f"[FAIL] 跳过停牌={skip}: 出错 - {str(e)}")
+            logger.error(f"[FAIL] 跳过停牌={skip}: 出错 - {str(e)}")
     
     # 测试6: 强制下载性能测试（指定时间）
-    print("\n测试6: 强制下载性能测试（指定时间）")
-    print("-" * 40)
+    logger.info("\n测试6: 强制下载性能测试（指定时间）")
+    logger.info("-" * 40)
     try:
         import time
         start_time = time.time()
@@ -4027,18 +4032,18 @@ def test_khHistory():
         
         if '000001.SZ' in result6 and not result6['000001.SZ'].empty:
             df = result6['000001.SZ']
-            print(f"[OK] 强制下载性能测试: 获取 {len(df)} 条记录，耗时 {elapsed_time:.1f}ms")
+            logger.info(f"[OK] 强制下载性能测试: 获取 {len(df)} 条记录，耗时 {elapsed_time:.1f}ms")
             if 'time' in df.columns:
                 time_range = f"{df['time'].min()} 到 {df['time'].max()}"
-                print(f"  时间范围: {time_range}")
+                logger.info(f"  时间范围: {time_range}")
         else:
-            print(f"[FAIL] 强制下载性能测试: 未获取到数据，耗时 {elapsed_time:.1f}ms")
+            logger.error(f"[FAIL] 强制下载性能测试: 未获取到数据，耗时 {elapsed_time:.1f}ms")
     except Exception as e:
-        print(f"[FAIL] 强制下载性能测试: 出错 - {str(e)}")
+        logger.error(f"[FAIL] 强制下载性能测试: 出错 - {str(e)}")
     
     # 测试7: 分钟数据精确时间控制测试
-    print("\n测试7: 分钟数据精确时间控制测试")
-    print("-" * 40)
+    logger.info("\n测试7: 分钟数据精确时间控制测试")
+    logger.info("-" * 40)
     minute_tests = [
         ('1m', '2024-12-01 10:30:00', 30),   # 1分钟数据，获取30条
         ('5m', '2024-12-01 14:30:00', 12),   # 5分钟数据，获取12条
@@ -4057,18 +4062,18 @@ def test_khHistory():
             )
             if '000001.SZ' in result7 and not result7['000001.SZ'].empty:
                 df = result7['000001.SZ']
-                print(f"[OK] {freq}数据到{test_time}: 获取 {len(df)} 条记录")
+                logger.info(f"[OK] {freq}数据到{test_time}: 获取 {len(df)} 条记录")
                 if 'time' in df.columns:
                     time_range = f"{df['time'].min()} 到 {df['time'].max()}"
-                    print(f"  时间范围: {time_range}")
+                    logger.info(f"  时间范围: {time_range}")
             else:
-                print(f"[FAIL] {freq}数据到{test_time}: 未获取到数据")
+                logger.error(f"[FAIL] {freq}数据到{test_time}: 未获取到数据")
         except Exception as e:
-            print(f"[FAIL] {freq}数据到{test_time}: 出错 - {str(e)}")
+            logger.error(f"[FAIL] {freq}数据到{test_time}: 出错 - {str(e)}")
     
     # 测试8: 复权方式测试（指定时间）
-    print("\n测试8: 复权方式测试（指定时间）")
-    print("-" * 40)
+    logger.info("\n测试8: 复权方式测试（指定时间）")
+    logger.info("-" * 40)
     for fq_type in ['none', 'pre', 'post']:
         try:
             result8 = khHistory(
@@ -4083,15 +4088,15 @@ def test_khHistory():
             if '000001.SZ' in result8 and not result8['000001.SZ'].empty:
                 df = result8['000001.SZ']
                 close_prices = df['close'].tolist()
-                print(f"[OK] 复权方式{fq_type}: 获取 {len(df)} 条记录，收盘价: {close_prices}")
+                logger.info(f"[OK] 复权方式{fq_type}: 获取 {len(df)} 条记录，收盘价: {close_prices}")
             else:
-                print(f"[FAIL] 复权方式{fq_type}: 未获取到数据")
+                logger.error(f"[FAIL] 复权方式{fq_type}: 未获取到数据")
         except Exception as e:
-            print(f"[FAIL] 复权方式{fq_type}: 出错 - {str(e)}")
+            logger.error(f"[FAIL] 复权方式{fq_type}: 出错 - {str(e)}")
     
     # 测试9: 时间边界验证测试
-    print("\n测试9: 时间边界验证测试")
-    print("-" * 40)
+    logger.info("\n测试9: 时间边界验证测试")
+    logger.info("-" * 40)
     boundary_tests = [
         ('20241201', '获取2024-12-01之前的数据'),
         ('2024-12-01 09:30:00', '获取9:30之前的分钟数据'),
@@ -4113,10 +4118,10 @@ def test_khHistory():
             )
             if '000001.SZ' in result9 and not result9['000001.SZ'].empty:
                 df = result9['000001.SZ']
-                print(f"[OK] {desc}: 获取 {len(df)} 条记录")
+                logger.info(f"[OK] {desc}: 获取 {len(df)} 条记录")
                 if 'time' in df.columns and len(df) > 0:
                     latest_time = df['time'].max()
-                    print(f"  最新时间: {latest_time}")
+                    logger.info(f"  最新时间: {latest_time}")
                     
                     # 解析目标时间进行验证
                     from datetime import datetime
@@ -4134,22 +4139,22 @@ def test_khHistory():
                     if is_minute:
                         # 分钟数据精确时间比较
                         if latest_time < target_time:
-                            print(f"  [OK] 时间边界验证通过: {latest_time} < {target_time}")
+                            logger.info(f"  [OK] 时间边界验证通过: {latest_time} < {target_time}")
                         else:
-                            print(f"  [FAIL] 时间边界验证失败: {latest_time} >= {target_time}")
+                            logger.error(f"  [FAIL] 时间边界验证失败: {latest_time} >= {target_time}")
                     else:
                         # 日线数据按日期比较
                         if latest_time.date() < target_time.date():
-                            print(f"  [OK] 日期边界验证通过: {latest_time.date()} < {target_time.date()}")
+                            logger.info(f"  [OK] 日期边界验证通过: {latest_time.date()} < {target_time.date()}")
                         else:
-                            print(f"  [FAIL] 日期边界验证失败: {latest_time.date()} >= {target_time.date()}")
+                            logger.error(f"  [FAIL] 日期边界验证失败: {latest_time.date()} >= {target_time.date()}")
             else:
-                print(f"[FAIL] {desc}: 未获取到数据")
+                logger.error(f"[FAIL] {desc}: 未获取到数据")
         except Exception as e:
-            print(f"[FAIL] {desc}: 出错 - {str(e)}")
+            logger.error(f"[FAIL] {desc}: 出错 - {str(e)}")
     
-    print("\n" + "=" * 50)
-    print("khHistory函数测试完成（不包含当前时间点，适合回测场景）")
+    logger.info("\n" + "=" * 50)
+    logger.info("khHistory函数测试完成（不包含当前时间点，适合回测场景）")
 
 
 # ============================================================================

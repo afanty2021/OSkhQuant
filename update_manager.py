@@ -500,7 +500,7 @@ class UpdateManager(QObject):
             
             if is_force_update:
                 # 强制更新时显示不同的对话框
-                msg = QMessageBox(self.parent)
+                msg = QMessageBox(self.parent) if self.parent else QMessageBox()
                 msg.setIcon(QMessageBox.Warning)
                 msg.setWindowTitle("强制更新")
                 msg.setTextFormat(Qt.RichText)
@@ -531,7 +531,7 @@ class UpdateManager(QObject):
                 QApplication.quit()
             else:
                 # 普通更新时的对话框
-                msg = QMessageBox(self.parent)
+                msg = QMessageBox(self.parent) if self.parent else QMessageBox()
                 msg.setIcon(QMessageBox.Information)
                 msg.setWindowTitle("发现新版本")
                 msg.setTextFormat(Qt.RichText)
@@ -554,7 +554,7 @@ class UpdateManager(QObject):
             
         except Exception as e:
             logging.error(f"显示更新对话框时出错: {str(e)}", exc_info=True)
-            QMessageBox.critical(self.parent, "错误", f"显示更新对话框时出错: {str(e)}")
+            QMessageBox.critical(self.parent if self.parent else None, "错误", f"显示更新对话框时出错: {str(e)}")
 
     def handle_force_update_close(self, event):
         """处理强制更新对话框的关闭事件"""

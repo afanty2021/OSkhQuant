@@ -1,4 +1,5 @@
 # coding: utf-8
+from logging_config import get_module_logger
 """
 提醒管理器模块
 提供声音提醒和微信推送的统一管理
@@ -6,6 +7,9 @@
 @author: OsKhQuant
 @version: 1.0
 """
+
+# 日志系统
+logger = get_module_logger(__name__)
 
 # ===== 标准库导入 =====
 import os
@@ -476,7 +480,7 @@ def create_alert_manager(config: Optional[Dict] = None) -> KhAlertManager:
 
 def test_alert_system():
     """测试提醒系统（仅用于调试）"""
-    print("=== 测试提醒管理器 ===")
+    logger.info("=== 测试提醒管理器 ===")
 
     # 测试配置
     config = {
@@ -497,7 +501,7 @@ def test_alert_system():
         "reason": "测试买入信号"
     }
     result1 = mgr.on_signal(signal1)
-    print(f"信号1触发结果: {result1}")
+    logger.info(f"信号1触发结果: {result1}")
 
     # 测试信号2 - 相同股票相同方向，应该被去重
     time.sleep(1)
@@ -508,7 +512,7 @@ def test_alert_system():
         "reason": "测试买入信号2"
     }
     result2 = mgr.on_signal(signal2)
-    print(f"信号2触发结果（应为False）: {result2}")
+    logger.info(f"信号2触发结果（应为False）: {result2}")
 
     # 测试信号3 - 不同方向，应该正常触发
     signal3 = {
@@ -518,10 +522,10 @@ def test_alert_system():
         "reason": "测试卖出信号"
     }
     result3 = mgr.on_signal(signal3)
-    print(f"信号3触发结果: {result3}")
+    logger.info(f"信号3触发结果: {result3}")
 
     # 打印统计
-    print(f"\n统计信息: {mgr.get_stats()}")
+    logger.info(f"\n统计信息: {mgr.get_stats()}")
 
 
 if __name__ == "__main__":

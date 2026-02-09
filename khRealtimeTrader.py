@@ -1,4 +1,5 @@
 # coding: utf-8
+from logging_config import get_module_logger
 """
 实盘交易引擎模块
 提供实时行情监控和自动交易功能
@@ -6,6 +7,9 @@
 @author: OsKhQuant
 @version: 1.0
 """
+
+# 日志系统
+logger = get_module_logger(__name__)
 
 # ===== 标准库导入 =====
 import os
@@ -75,7 +79,7 @@ class RealtimeTrader:
 
         # 交易相关
         self.trader: Optional[XtQuantTrader] = None
-        self.trade_manager = KhTradeManager()
+        self.trade_manager = KhTradeManager(config)
         self.session_id = int(time.time())
 
         # 运行时数据
@@ -510,7 +514,7 @@ def create_realtime_trader(
 
 def test_realtime_trader():
     """测试实盘交易引擎（模拟模式）"""
-    print("=== 测试实盘交易引擎 ===")
+    logger.info("=== 测试实盘交易引擎 ===")
 
     # 注意：此测试需要MiniQMT运行环境
 
@@ -536,9 +540,9 @@ def test_realtime_trader():
         alert_manager=alert_mgr
     )
 
-    print(f"股票池: {trader.stock_list}")
-    print(f"K线周期: {trader.period}")
-    print(f"提醒管理器已配置: {alert_mgr is not None}")
+    logger.info(f"股票池: {trader.stock_list}")
+    logger.info(f"K线周期: {trader.period}")
+    logger.info(f"提醒管理器已配置: {alert_mgr is not None}")
 
 
 if __name__ == "__main__":

@@ -2,7 +2,12 @@ import sys
 import os
 import pandas as pd
 import matplotlib.pyplot as plt
-from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, 
+from logging_config import get_module_logger
+
+# 日志系统
+logger = get_module_logger(__name__)
+
+from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel,
                              QPushButton, QFileDialog, QComboBox, QSizePolicy, QMessageBox, QDialog)
 from PyQt5.QtCore import Qt, QPoint
 from PyQt5.QtGui import QFont, QIcon, QMouseEvent
@@ -440,7 +445,7 @@ class StockDataAnalyzerGUI(QMainWindow):
 
     def toggle_maximize(self):
         if self.max_button is None:
-            print("Warning: max_button is None")
+            logger.warning("Warning: max_button is None")
             return
 
         if self.isMaximized():
@@ -879,7 +884,7 @@ class StockDataAnalyzerGUI(QMainWindow):
             sel.annotation.set_fontweight('bold') # 加粗文字
             
         except Exception as e:
-            print(f"悬停显示出错: {str(e)}")
+            logger.info(f"悬停显示出错: {str(e)}")
 
     def plot_data(self, df, x_axis, stock_code, stock_name):
             ax = self.figure.axes[0]

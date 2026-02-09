@@ -2,8 +2,13 @@ import sys
 import os
 import struct
 from datetime import datetime
-from PyQt5.QtWidgets import (QApplication, QMainWindow, QHBoxLayout, QVBoxLayout, 
-                             QWidget, QTreeWidget, QTreeWidgetItem, QTableWidget, 
+from logging_config import get_module_logger
+
+# 日志系统
+logger = get_module_logger(__name__)
+
+from PyQt5.QtWidgets import (QApplication, QMainWindow, QHBoxLayout, QVBoxLayout,
+                             QWidget, QTreeWidget, QTreeWidgetItem, QTableWidget,
                              QTableWidgetItem, QHeaderView, QMessageBox, QLabel,
                              QSplitter, QProgressBar, QStatusBar, QPushButton, QSizePolicy, QDialog, QDesktopWidget,
                              QComboBox, QDateEdit, QGroupBox, QCheckBox, QGridLayout, QTextEdit, QFileDialog, QInputDialog, QScrollArea)
@@ -122,11 +127,11 @@ class LoadingDialog(QDialog):
         self.raise_()
         self.activateWindow()
         QApplication.processEvents()  # 立即刷新界面
-        print(f"Loading dialog shown: {message}")  # 调试信息
+        logger.debug(f"Loading dialog shown: {message}")
         
     def hide_loading(self):
         """隐藏加载对话框"""
-        print("Loading dialog hidden")  # 调试信息
+        logger.debug("Loading dialog hidden")
         self.hide()
 
 
@@ -203,9 +208,9 @@ def supplement_data_worker(params, progress_queue, result_queue, stop_event):
                 try:
                     progress_queue.put(('progress', percent), timeout=1)
                     last_progress_time = current_time
-                    print(f"[进程] 发送进度: {percent}%")  # 调试信息
+                    logger.debug(f"[进程] 发送进度: {percent}%")
                 except Exception as e:
-                    print(f"[进程] 发送进度失败: {e}")
+                    logger.error(f"[进程] 发送进度失败: {e}")
         
         def log_callback(message):
             nonlocal last_status_time
@@ -252,9 +257,9 @@ def supplement_data_worker(params, progress_queue, result_queue, stop_event):
                 if is_important or current_time - last_status_time >= update_interval:
                     progress_queue.put(('status', str(message)), timeout=1)
                     last_status_time = current_time
-                    print(f"[进程] 发送状态: {message}")  # 调试信息
+                    logger.debug(f"[进程] 发送状态: {message}")
             except Exception as e:
-                print(f"[进程] log_callback 处理错误: {e}")
+                logger.error(f"[进程] log_callback 处理错误: {e}")
         
         def check_interrupt():
             # 检查停止事件
@@ -340,10 +345,10 @@ class SupplementThread(QThread):
                         try:
                             msg_type, data = self.progress_queue.get_nowait()
                             if msg_type == 'progress':
-                                print(f"[线程] 接收进度: {data}%")  # 调试信息
+                                logger.debug(f"[线程] 接收进度: {data}%")
                                 self.progress.emit(data)
                             elif msg_type == 'status':
-                                print(f"[线程] 接收状态: {data}")  # 调试信息
+                                logger.debug(f"[线程] 接收状态: {data}")
                                 self.status_update.emit(data)
                         except Empty:
                             break
@@ -453,7 +458,7 @@ class DataLoadThread(QThread):
         except Exception as e:
             import traceback
             error_msg = f"数据加载失败: {str(e)}\n{traceback.format_exc()}"
-            print(f"DataLoadThread error: {error_msg}")  # 调试信息
+            logger.error(f"DataLoadThread error: {error_msg}")
             self.error_occurred.emit(str(e))
 
 
@@ -1492,7 +1497,7 @@ class GUIDataViewer(QMainWindow):
             return
         
         # 调试信息：显示读取到的路径
-        print(f"读取到的miniQMT路径: {self.qmt_path}")
+        logger.info(f"读取到的miniQMT路径: {self.qmt_path}")
         logging.info(f"读取到的miniQMT路径: {self.qmt_path}")
             
         # 检查datadir文件夹
@@ -1834,7 +1839,7 @@ class GUIDataViewer(QMainWindow):
             self.update_breadcrumb([])
             
         except Exception as e:
-            print(f"重新加载配置时出错: {e}")
+            logger.info(f"重新加载配置时出错: {e}")
             logging.error(f"重新加载配置时出错: {e}")
             
     def on_tree_item_clicked(self, item, column):
@@ -2345,7 +2350,7 @@ class GUIDataViewer(QMainWindow):
         
         # 显示加载对话框
         loading_message = f"正在加载 {stock_code} - {stock_name} ({formatted_date} tick数据)..."
-        print(f"Showing loading dialog: {loading_message}")  # 调试信息
+        logger.debug(f"Showing loading dialog: {loading_message}")
         self.loading_dialog.show_loading(loading_message)
         
         self.info_label.setText(loading_message)
@@ -2355,7 +2360,7 @@ class GUIDataViewer(QMainWindow):
             self.data_thread.quit()
             self.data_thread.wait()
         
-        print(f"Starting data load thread for file: {file_path}")  # 调试信息
+        logger.debug(f"Starting data load thread for file: {file_path}")
         self.data_thread = DataLoadThread(file_path, "tick", data_dir=self.datadir_path)
         self.data_thread.data_loaded.connect(self.on_data_loaded)
         self.data_thread.progress_updated.connect(self.on_progress_updated)
@@ -2465,14 +2470,14 @@ class GUIDataViewer(QMainWindow):
             loading_message = f"正在加载 {stock_code} - {stock_name} ({period_type} 数据)..."
             self.info_label.setText(loading_message)
             # 显示加载对话框
-            print(f"Showing loading dialog: {loading_message}")  # 调试信息
+            logger.debug(f"Showing loading dialog: {loading_message}")
             self.loading_dialog.show_loading(loading_message)
         else:
             filename = os.path.basename(file_path)
             loading_message = f"正在加载 {filename} ({period_type} 数据)..."
             self.info_label.setText(loading_message)
             # 显示加载对话框
-            print(f"Showing loading dialog: {loading_message}")  # 调试信息
+            logger.debug(f"Showing loading dialog: {loading_message}")
             self.loading_dialog.show_loading(loading_message)
         
         # 在后台线程中加载数据
@@ -2480,7 +2485,7 @@ class GUIDataViewer(QMainWindow):
             self.data_thread.quit()
             self.data_thread.wait()
         
-        print(f"Starting data load thread for file: {file_path}")  # 调试信息
+        logger.debug(f"Starting data load thread for file: {file_path}")
         self.data_thread = DataLoadThread(file_path, period_type, data_dir=self.datadir_path)
         self.data_thread.data_loaded.connect(self.on_data_loaded)
         self.data_thread.progress_updated.connect(self.on_progress_updated)
@@ -2501,7 +2506,7 @@ class GUIDataViewer(QMainWindow):
             
     def on_data_loaded(self, data):
         """数据加载完成"""
-        print(f"on_data_loaded called with data length: {len(data) if data else 'None'}")  # 调试信息
+        logger.debug(f"on_data_loaded called with data length: {len(data) if data else 'None'}")
         self.progress_bar.setVisible(False)
         # 隐藏加载对话框
         self.loading_dialog.hide_loading()
@@ -2657,11 +2662,11 @@ class GUIDataViewer(QMainWindow):
             """)
             
             # 输出调试信息
-            print(f"计算字段: {calculated_columns}")
-            print(f"所有字段: {list(df.columns)}")
-            print(f"对应中文名: {chinese_headers}")
-            print(f"计算字段: {calculated_columns}")
-            print(f"计算字段中文名: {calculated_chinese_names}")
+            logger.info(f"计算字段: {calculated_columns}")
+            logger.info(f"所有字段: {list(df.columns)}")
+            logger.info(f"对应中文名: {chinese_headers}")
+            logger.info(f"计算字段: {calculated_columns}")
+            logger.info(f"计算字段中文名: {calculated_chinese_names}")
             
             # 输出原始字段识别结果
             original_columns = []
@@ -2686,8 +2691,8 @@ class GUIDataViewer(QMainWindow):
                     original_columns.append(col)
                     original_chinese_names.append(chinese_name)
             
-            print(f"原始字段: {original_columns}")
-            print(f"原始字段中文名: {original_chinese_names}")
+            logger.info(f"原始字段: {original_columns}")
+            logger.info(f"原始字段中文名: {original_chinese_names}")
             
             # 检查用户提到的特定字段
             missing_fields = []
@@ -2696,22 +2701,22 @@ class GUIDataViewer(QMainWindow):
                     missing_fields.append(field)
             
             if missing_fields:
-                print(f"数据中缺失的字段: {missing_fields}")
-                print("注意：tick数据通常不包含开高低收字段，只有K线数据才有这些字段")
+                logger.info(f"数据中缺失的字段: {missing_fields}")
+                logger.info("注意：tick数据通常不包含开高低收字段，只有K线数据才有这些字段")
             else:
-                print("用户提到的字段都存在于数据中")
+                logger.info("用户提到的字段都存在于数据中")
             
             # 详细显示每个字段的分类情况
-            print("\n=== 字段分类详情 ===")
+            logger.info("\n=== 字段分类详情 ===")
             for i, col in enumerate(df.columns):
                 chinese_name = chinese_headers[i]
                 if col in original_columns:
-                    print(f"✓ 原始字段: {col} -> {chinese_name}")
+                    logger.info(f"✓ 原始字段: {col} -> {chinese_name}")
                 elif col in calculated_columns:
-                    print(f"⚡ 计算字段: {col} -> {chinese_name}")
+                    logger.info(f"⚡ 计算字段: {col} -> {chinese_name}")
                 else:
-                    print(f"❓ 未分类字段: {col} -> {chinese_name}")
-            print("===================")
+                    logger.info(f"❓ 未分类字段: {col} -> {chinese_name}")
+            logger.info("===================")
             
             # 重新设置表头项，确保蓝色能正确显示
             header_font = QFont()
@@ -2727,7 +2732,7 @@ class GUIDataViewer(QMainWindow):
                     header_item.setForeground(QColor('#2E6DA4'))  # 深蓝色
                     header_item.setBackground(QColor('#404040'))  # 保持背景色一致
                     header_item.setToolTip(f"计算字段: {chinese_name} (二次计算数据)")
-                    print(f"设置蓝色表头: {chinese_name}")
+                    logger.info(f"设置蓝色表头: {chinese_name}")
                 else:
                     header_item.setForeground(QColor('#e8e8e8'))  # 默认白色
                     header_item.setBackground(QColor('#404040'))  # 保持背景色一致
@@ -2845,7 +2850,7 @@ class GUIDataViewer(QMainWindow):
             
     def on_progress_updated(self, message):
         """进度更新"""
-        print(f"Progress update: {message}")  # 调试信息
+        logger.debug(f"Progress update: {message}")
         self.status_bar.showMessage(message)
         # 同时更新加载对话框的信息
         if self.loading_dialog.isVisible():
@@ -2853,7 +2858,7 @@ class GUIDataViewer(QMainWindow):
         
     def on_error_occurred(self, error_message):
         """错误处理"""
-        print(f"on_error_occurred called with error: {error_message}")  # 调试信息
+        logger.error(f"on_error_occurred called with error: {error_message}")
         self.progress_bar.setVisible(False)
         # 隐藏加载对话框
         self.loading_dialog.hide_loading()
@@ -3547,7 +3552,7 @@ class GUIDataViewer(QMainWindow):
         try:
             # 如果补充数据线程正在运行，点击按钮就停止补充
             if hasattr(self, 'supplement_thread') and self.supplement_thread and self.supplement_thread.isRunning():
-                print("[UI] 停止正在运行的补充线程")  # 调试信息
+                logger.debug("[UI] 停止正在运行的补充线程")
                 self.supplement_thread.stop()
                 self.supplement_thread.wait(3000)  # 等待最多3秒
                 self.supplement_thread = None  # 清空线程引用
@@ -3617,7 +3622,7 @@ class GUIDataViewer(QMainWindow):
             # 设置进度条
             self.supplement_progress_bar.setVisible(True)
             self.supplement_progress_bar.setValue(0)
-            print("[UI] 显示进度条")  # 调试信息
+            logger.debug("[UI] 显示进度条")
 
             # 创建参数字典
             params = {
@@ -3635,21 +3640,21 @@ class GUIDataViewer(QMainWindow):
                 self.supplement_thread = None
             
             # 启动补充数据线程
-            print("[UI] 创建并启动补充数据线程")  # 调试信息
+            logger.debug("[UI] 创建并启动补充数据线程")
             self.supplement_thread = SupplementThread(params, self)
             self.supplement_thread.progress.connect(self.update_supplement_progress)
             self.supplement_thread.finished.connect(self.supplement_finished)
             self.supplement_thread.error.connect(self.handle_supplement_error)
             self.supplement_thread.status_update.connect(self.update_supplement_status)
             self.supplement_thread.start()
-            print("[UI] 线程已启动")  # 调试信息
+            logger.debug("[UI] 线程已启动")
 
         except Exception as e:
             QMessageBox.critical(self, "错误", f"启动补充数据时出错: {str(e)}")
 
     def update_supplement_progress(self, value):
         """更新补充数据进度"""
-        print(f"[UI] 更新进度条: {value}%")  # 调试信息
+        logger.debug(f"[UI] 更新进度条: {value}%")
         self.supplement_progress_bar.setValue(value)
 
     def update_supplement_status(self, message):
@@ -3658,7 +3663,7 @@ class GUIDataViewer(QMainWindow):
         if len(message) > 100:
             message = message[:97] + "..."
         
-        print(f"[UI] 更新状态: {message}")  # 调试信息
+        logger.debug(f"[UI] 更新状态: {message}")
         self.supplement_status_label.setText(message)
 
     def supplement_finished(self, success, message):

@@ -8,6 +8,7 @@ pytest-benchmark>=4.0.0
 pytest-mock>=3.10.0
 pytest-xdist>=3.0.0  # 并行测试
 pytest-timeout>=2.1.0  # 超时控制
+pytest-qt>=4.0.0  # PyQt5 GUI测试框架
 
 # 代码质量
 flake8>=6.0.0
