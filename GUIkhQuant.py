@@ -271,10 +271,26 @@ class KhQuantGUI(QMainWindow):
         self.progress_signal.connect(self.update_progress_bar, Qt.QueuedConnection)
         self.show_alert_signal.connect(self._on_show_alert, Qt.QueuedConnection)
         
-        # 设置定时器定期刷新日志缓冲区
+        # 设置定时器定期刷新日志缓冲区（动态调整机制）
         self.log_flush_timer = QTimer()
-        self.log_flush_timer.timeout.connect(self.flush_logs)
-        self.log_flush_timer.start(5000)  # 每5秒刷新一次日志
+        self.log_flush_timer.timeout.connect(self._on_flush_timer)
+
+        # 动态刷新间隔参数
+        self._flush_intervals = {
+            'high_load': 1000,    # 高负载: 1秒
+            'medium_load': 2000,  # 中负载: 2秒
+            'low_load': 5000      # 低负载: 5秒
+        }
+        self._load_thresholds = {
+            'high': 10000,  # 高负载阈值：10000条日志
+            'medium': 1000  # 中负载阈值：1000条日志
+        }
+        # 防抖机制：避免频繁切换间隔
+        self._flush_interval_stable_count = 0
+        self._flush_stable_threshold = 3  # 需要连续3次检测到相同负载级别才切换间隔
+        self._current_load_level = 'low'  # 当前负载级别：low, medium, high
+
+        self.log_flush_timer.start(5000)  # 初始5秒刷新一次日志
         
         # 初始化代码编辑器模块（已废弃，现在使用EmbeddedVSCodeManager）
         self.editor_module = None
@@ -832,6 +848,55 @@ class KhQuantGUI(QMainWindow):
         import traceback
         self.log_message(f"错误详情:\n{traceback.format_exc()}", "ERROR")
     
+    def _get_log_buffer_size(self):
+        """获取当前日志缓冲区总大小（包括log_entries和delayed_logs）"""
+        size = 0
+        if hasattr(self, 'log_entries'):
+            size += len(self.log_entries)
+        if hasattr(self, 'delayed_logs'):
+            size += len(self.delayed_logs)
+        return size
+
+    def _get_log_load_level(self, buffer_size):
+        """根据日志缓冲区大小确定负载级别"""
+        if buffer_size > self._load_thresholds['high']:
+            return 'high'
+        elif buffer_size > self._load_thresholds['medium']:
+            return 'medium'
+        else:
+            return 'low'
+
+    def _adjust_flush_interval(self):
+        """根据日志量动态调整刷新间隔（带防抖机制）"""
+        try:
+            buffer_size = self._get_log_buffer_size()
+            current_level = self._get_log_load_level(buffer_size)
+
+            # 防抖机制：只有连续检测到相同负载级别才切换间隔
+            if current_level != self._current_load_level:
+                self._flush_interval_stable_count += 1
+                if self._flush_interval_stable_count >= self._flush_stable_threshold:
+                    # 确认负载级别变化，切换间隔
+                    new_interval = self._flush_intervals[f'{current_level}_load']
+                    old_interval = self.log_flush_timer.interval()
+                    if new_interval != old_interval:
+                        self.log_flush_timer.setInterval(new_interval)
+                        print(f"[日志Flush] 动态调整刷新间隔: {old_interval}ms -> {new_interval}ms "
+                              f"(缓冲区: {buffer_size}条, 负载: {current_level})")
+                    self._current_load_level = current_level
+                    self._flush_interval_stable_count = 0
+            else:
+                # 负载级别稳定，重置计数器
+                self._flush_interval_stable_count = 0
+        except Exception as e:
+            # 避免在调整时产生新的异常循环
+            print(f"调整日志刷新间隔时出错: {e}")
+
+    def _on_flush_timer(self):
+        """定时器触发的日志刷新处理"""
+        self.flush_logs()
+        self._adjust_flush_interval()  # 刷新后动态调整间隔
+
     def flush_logs(self):
         """强制刷新日志缓冲区，确保日志及时写入文件"""
         try:

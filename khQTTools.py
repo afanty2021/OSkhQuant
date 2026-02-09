@@ -28,6 +28,7 @@ import numpy as np
 import logging
 import ast
 import holidays  # 添加这个导入，用于处理holidays.China()
+from functools import lru_cache
 from typing import Dict, List, Union, Optional
 import math
 from khTrade import KhTradeManager
@@ -77,6 +78,133 @@ _cn_holidays = holidays.China()
 
 # 默认价格精度（股票为2位，ETF为3位）
 _default_price_decimals = 2
+
+# ============================================================================
+# 交易日历缓存优化
+# ============================================================================
+
+@lru_cache(maxsize=4096)
+def _is_trade_day_cached(date_str: str) -> bool:
+    """带LRU缓存的交易日判断核心函数
+
+    Args:
+        date_str: 标准化的日期字符串 "YYYY-MM-DD" 或 "YYYYMMDD"
+
+    Returns:
+        bool: 是否为交易日
+
+    说明:
+        - 此函数使用lru_cache缓存结果，提升频繁调用时的性能
+        - 缓存大小设置为4096，可覆盖约11年的交易日数据
+        - 只处理标准格式的日期字符串，参数预处理由外部函数完成
+    """
+    try:
+        # 解析日期（支持两种标准格式）
+        if '-' in date_str and len(date_str) == 10:
+            date_obj = datetime.strptime(date_str, "%Y-%m-%d")
+        elif date_str.isdigit() and len(date_str) == 8:
+            date_obj = datetime.strptime(date_str, "%Y%m%d")
+        else:
+            # 非标准格式，不使用缓存
+            return False
+
+        # 首先排除周末 (5代表周六, 6代表周日)
+        if date_obj.weekday() >= 5:
+            return False
+
+        # 使用holidays库判断是否为法定节假日
+        date_only = date_obj.date()
+        if date_only in _cn_holidays:
+            return False
+
+        # 非周末且非法定节假日，则视为交易日
+        return True
+
+    except Exception:
+        # 解析失败，返回False（非交易日）
+        return False
+
+@lru_cache(maxsize=512)
+def _get_trade_days_count_cached(start_date: str, end_date: str) -> int:
+    """带LRU缓存的交易日天数计算核心函数
+
+    Args:
+        start_date: 标准化的起始日期 "YYYY-MM-DD"
+        end_date: 标准化的结束日期 "YYYY-MM-DD"
+
+    Returns:
+        int: 交易日天数
+
+    说明:
+        - 此函数使用lru_cache缓存结果
+        - 缓存大小设置为512，覆盖常见的日期范围查询
+        - 内部调用带缓存的_is_trade_day_cached函数
+    """
+    try:
+        # 解析起始和结束日期
+        start_dt = datetime.strptime(start_date, "%Y-%m-%d")
+        end_dt = datetime.strptime(end_date, "%Y-%m-%d")
+
+        # 确保开始日期不晚于结束日期
+        if start_dt > end_dt:
+            return 0
+
+        # 初始化计数器
+        trade_days = 0
+
+        # 遍历日期范围内的每一天
+        current_dt = start_dt
+        while current_dt <= end_dt:
+            current_date_str = current_dt.strftime("%Y-%m-%d")
+            # 使用带缓存的is_trade_day函数判断
+            if _is_trade_day_cached(current_date_str):
+                trade_days += 1
+
+            # 前进到下一天
+            current_dt += timedelta(days=1)
+
+        return trade_days
+
+    except Exception:
+        return 0
+
+def clear_trade_calendar_cache() -> None:
+    """清理交易日历缓存
+
+    说明:
+        - 清理_is_trade_day_cached和_get_trade_days_count_cached的缓存
+        - 在需要更新交易日历数据时调用（如假期调整）
+        - 正常情况下无需调用，LRU会自动管理缓存
+    """
+    _is_trade_day_cached.cache_clear()
+    _get_trade_days_count_cached.cache_clear()
+    logging.info("交易日历缓存已清理")
+
+def get_trade_calendar_cache_info() -> Dict[str, int]:
+    """获取交易日历缓存统计信息
+
+    Returns:
+        Dict[str, int]: 包含以下键的字典
+            - 'is_trade_day_hits': is_trade_day缓存命中次数
+            - 'is_trade_day_misses': is_trade_day缓存未命中次数
+            - 'is_trade_day_size': is_trade_day缓存当前大小
+            - 'get_trade_days_count_hits': get_trade_days_count缓存命中次数
+            - 'get_trade_days_count_misses': get_trade_days_count缓存未命中次数
+            - 'get_trade_days_count_size': get_trade_days_count缓存当前大小
+    """
+    info1 = _is_trade_day_cached.cache_info()
+    info2 = _get_trade_days_count_cached.cache_info()
+
+    return {
+        'is_trade_day_hits': info1.hits,
+        'is_trade_day_misses': info1.misses,
+        'is_trade_day_size': info1.currsize,
+        'is_trade_day_maxsize': info1.maxsize,
+        'get_trade_days_count_hits': info2.hits,
+        'get_trade_days_count_misses': info2.misses,
+        'get_trade_days_count_size': info2.currsize,
+        'get_trade_days_count_maxsize': info2.maxsize
+    }
 
 def is_etf(stock_code: str) -> bool:
     """判断是否为ETF（不包括LOF）
@@ -295,24 +423,29 @@ def is_trade_time() -> bool:
 
 def is_trade_day(date_str: str = None) -> bool:
     """判断是否为交易日（工作日且非法定节假日）
-    
+
     Args:
         date_str: 日期字符串，支持格式：
                  - "YYYY-MM-DD" (如: "2024-12-25")
                  - "YYYYMMDD" (如: "20241225")
                  - None (默认为当天)
-        
+
     Returns:
         bool: 是否为交易日
+
+    性能优化:
+        - 使用LRU缓存加速频繁调用
+        - 缓存命中后响应时间 < 1ms
+        - 缓存大小: 4096条记录（约11年交易日）
     """
     if date_str is None:
         date_str = datetime.now().strftime("%Y-%m-%d")
-    
+
     # 标准化日期格式
     try:
         # 尝试解析不同的日期格式
         date_obj = None
-        
+
         # 格式1: YYYY-MM-DD
         if '-' in date_str and len(date_str) == 10:
             date_obj = datetime.strptime(date_str, "%Y-%m-%d")
@@ -327,24 +460,22 @@ def is_trade_day(date_str: str = None) -> bool:
                     break
                 except ValueError:
                     continue
-        
+
         if date_obj is None:
             raise ValueError(f"无法解析日期格式: {date_str}")
-        
+
+        # 标准化为YYYY-MM-DD格式用于缓存
+        standardized_date = date_obj.strftime("%Y-%m-%d")
+
         # 首先排除周末 (5代表周六, 6代表周日)
         if date_obj.weekday() >= 5:
             return False
-        
-        # 使用holidays库判断是否为法定节假日
-        date_only = date_obj.date()
-        if date_only in _cn_holidays:
-            return False
-        
-        # 非周末且非法定节假日，则视为交易日
-        return True
-        
+
+        # 使用带缓存的函数判断是否为法定节假日
+        return _is_trade_day_cached(standardized_date)
+
     except Exception as e:
-        print(f"判断交易日异常: {str(e)}")
+        logging.warning(f"判断交易日异常: {str(e)}")
         # 如果出现异常，尝试基本的日期解析
         try:
             # 再次尝试解析常见格式
@@ -355,62 +486,60 @@ def is_trade_day(date_str: str = None) -> bool:
                     break
                 except ValueError:
                     continue
-            
+
             if date_obj is None:
-                print(f"无法解析日期格式: {date_str}，默认按交易日处理")
+                logging.warning(f"无法解析日期格式: {date_str}，默认按交易日处理")
                 return True
-                
+
             date_only = date_obj.date()
             if date_only in _cn_holidays:
-                print(f"日期 {date_str} 是法定节假日（{_cn_holidays.get(date_only)}），非交易日")
+                logging.warning(f"日期 {date_str} 是法定节假日（{_cn_holidays.get(date_only)}），非交易日")
                 return False
             # 如果是周末，非交易日
             if date_obj.weekday() >= 5:
-                print(f"日期 {date_str} 是周末，非交易日")
+                logging.warning(f"日期 {date_str} 是周末，非交易日")
                 return False
             return True
         except:
             # 实在判断不出来，默认为交易日
-            print(f"无法确定 {date_str} 是否为交易日，默认按普通工作日处理")
+            logging.warning(f"无法确定 {date_str} 是否为交易日，默认按普通工作日处理")
             return True
 
 def get_trade_days_count(start_date: str, end_date: str) -> int:
     """计算指定日期范围内的交易日天数
-    
+
     Args:
         start_date: 起始日期，格式为"YYYY-MM-DD"
         end_date: 结束日期，格式为"YYYY-MM-DD"
-        
+
     Returns:
         int: 交易日天数
+
+    性能优化:
+        - 使用LRU缓存加速频繁调用
+        - 缓存命中后响应时间显著提升
+        - 缓存大小: 512条记录（常见日期范围查询）
     """
     try:
-        # 解析起始和结束日期
+        # 标准化日期格式
         start_dt = datetime.strptime(start_date, "%Y-%m-%d")
         end_dt = datetime.strptime(end_date, "%Y-%m-%d")
-        
+
         # 确保开始日期不晚于结束日期
         if start_dt > end_dt:
             logging.error(f"起始日期 {start_date} 晚于结束日期 {end_date}")
             return 0
-            
-        # 初始化计数器
-        trade_days = 0
-        
-        # 遍历日期范围内的每一天
-        current_dt = start_dt
-        while current_dt <= end_dt:
-            current_date_str = current_dt.strftime("%Y-%m-%d")
-            # 使用is_trade_day函数判断是否为交易日
-            if is_trade_day(current_date_str):
-                trade_days += 1
-            
-            # 前进到下一天
-            current_dt += timedelta(days=1)
-            
+
+        # 标准化为YYYY-MM-DD格式用于缓存
+        standardized_start = start_dt.strftime("%Y-%m-%d")
+        standardized_end = end_dt.strftime("%Y-%m-%d")
+
+        # 使用带缓存的函数计算
+        trade_days = _get_trade_days_count_cached(standardized_start, standardized_end)
+
         logging.info(f"从 {start_date} 到 {end_date} 共有 {trade_days} 个交易日")
         return trade_days
-        
+
     except Exception as e:
         logging.error(f"计算交易日天数时出错: {str(e)}")
         return 0

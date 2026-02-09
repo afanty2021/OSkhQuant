@@ -61,6 +61,12 @@ class TradeCalendar:
     AUCTION_START = "09:15"
     AUCTION_END = "09:25"
 
+    # 缓存配置
+    CACHE_IS_TRADE_DAY_MAXSIZE = 4096  # 单日交易日缓存大小（约11年）
+    CACHE_GET_TRADE_DAYS_COUNT_MAXSIZE = 512  # 期间交易日缓存大小
+    CACHE_TARGET_HIT_RATE = 0.8  # 目标缓存命中率80%
+    CACHE_TARGET_RESPONSE_TIME_MS = 1.0  # 目标响应时间<1ms
+
 
 # ============================================================================
 # 交易常量

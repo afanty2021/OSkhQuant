@@ -153,16 +153,32 @@ def download_data_worker(params, progress_queue, result_queue, stop_event):
         # 控制更新频率
         last_progress_time = 0
         last_status_time = 0
+        last_reported_percent = -1.0  # 上次报告的进度百分比
         update_interval = 1.0  # 1秒更新一次，减少UI压力
-        
+        percent_threshold = 1.0  # 每次至少更新1%
+
         def progress_callback(percent):
-            nonlocal last_progress_time
+            nonlocal last_progress_time, last_reported_percent
             current_time = time.time()
-            if current_time - last_progress_time >= update_interval or percent >= 100:
+
+            # 基于百分比的节流：每1%更新一次，或完成时(100%)，或首次更新(0%)
+            percent_diff = abs(percent - last_reported_percent)
+            should_update_by_percent = (
+                last_reported_percent < 0 or  # 首次更新
+                percent_diff >= percent_threshold or  # 达到1%变化
+                percent >= 100.0  # 完成时必须更新
+            )
+
+            # 基于时间的节流：至少间隔1秒
+            should_update_by_time = current_time - last_progress_time >= update_interval
+
+            # 满足任一条件即更新（优先使用百分比节流）
+            if should_update_by_percent or should_update_by_time:
                 if not stop_event.is_set():
                     try:
                         progress_queue.put(('progress', percent), timeout=1)
                         last_progress_time = current_time
+                        last_reported_percent = percent
                     except:
                         pass
                 else:
@@ -416,8 +432,10 @@ def supplement_data_worker(params, progress_queue, result_queue, stop_event):
         # 进度和状态更新的时间控制
         last_progress_time = 0
         last_status_time = 0
+        last_reported_percent = -1.0  # 上次报告的进度百分比
         update_interval = 0.5  # 500毫秒
-        
+        percent_threshold = 1.0  # 每次至少更新1%
+
         # 统计信息
         supplement_stats = {
             'total_stocks': 0,
@@ -426,14 +444,28 @@ def supplement_data_worker(params, progress_queue, result_queue, stop_event):
             'error_count': 0,
             'empty_stocks': []
         }
-        
+
         def progress_callback(percent):
-            nonlocal last_progress_time
+            nonlocal last_progress_time, last_reported_percent
             current_time = time.time()
-            if current_time - last_progress_time >= update_interval or percent >= 100:
+
+            # 基于百分比的节流：每1%更新一次，或完成时(100%)，或首次更新(0%)
+            percent_diff = abs(percent - last_reported_percent)
+            should_update_by_percent = (
+                last_reported_percent < 0 or  # 首次更新
+                percent_diff >= percent_threshold or  # 达到1%变化
+                percent >= 100.0  # 完成时必须更新
+            )
+
+            # 基于时间的节流：至少间隔500毫秒
+            should_update_by_time = current_time - last_progress_time >= update_interval
+
+            # 满足任一条件即更新（优先使用百分比节流）
+            if should_update_by_percent or should_update_by_time:
                 try:
                     progress_queue.put(('progress', percent), timeout=1)
                     last_progress_time = current_time
+                    last_reported_percent = percent
                     print(f"[GUI进程] 发送进度: {percent}%")  # 调试信息
                 except Exception as e:
                     print(f"[GUI进程] 发送进度失败: {e}")

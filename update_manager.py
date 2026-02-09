@@ -232,6 +232,46 @@ class UpdateDownloadThread(QThread):
                 
                 # 下载完成后，检查文件是否为有效的可执行文件
                 if os.path.exists(temp_file) and os.path.getsize(temp_file) > 0:
+                    # 验证文件哈希值（如果版本信息中提供了checksum）
+                    expected_checksum = self.version_info.get('checksum')
+                    if expected_checksum:
+                        logging.info(f"开始验证文件哈希值...")
+                        # 计算下载文件的SHA256哈希值
+                        sha256_hash = hashlib.sha256()
+                        try:
+                            with open(temp_file, 'rb') as f:
+                                # 分块读取文件以处理大文件
+                                for byte_block in iter(lambda: f.read(4096), b''):
+                                    sha256_hash.update(byte_block)
+                            calculated_checksum = sha256_hash.hexdigest()
+
+                            logging.debug(f"计算得到的哈希值: {calculated_checksum}")
+                            logging.debug(f"期望的哈希值: {expected_checksum}")
+
+                            # 比对哈希值
+                            if calculated_checksum != expected_checksum:
+                                error_msg = (
+                                    f"文件哈希验证失败！\n"
+                                    f"期望: {expected_checksum}\n"
+                                    f"实际: {calculated_checksum}\n"
+                                    f"下载的文件可能已损坏或被篡改。"
+                                )
+                                logging.error(error_msg)
+                                raise Exception(error_msg)
+
+                            logging.info("文件哈希验证通过")
+                        except Exception as e:
+                            # 哈希验证过程中的其他错误
+                            if '哈希验证失败' not in str(e):
+                                error_msg = f"哈希验证过程中出错: {str(e)}"
+                                logging.error(error_msg)
+                                raise Exception(error_msg)
+                            else:
+                                # 重新抛出哈希不匹配的异常
+                                raise
+                    else:
+                        logging.info("版本信息中未提供checksum，跳过哈希验证")
+
                     # 如果目标文件已存在，先删除
                     if os.path.exists(save_file):
                         os.remove(save_file)
